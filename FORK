@@ -1,0 +1,14 @@
+Forked from https://github.com/apoelstra/rust-secp256k1
+
+The forked repository is tracked into a branch called 'vendor'. The master
+branch of this repository contains our modifications on top of that. To
+update from upstream:
+
+    git remote add upstream https://github.com/apoelstra/rust-secp256k1
+		git checkout vendor
+		git pull upstream secp256k1-zkp
+		git push origin vendor
+		git checkout master
+		git merge vendor
+		git push
+		
