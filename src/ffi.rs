@@ -175,7 +175,7 @@ extern "C" {
                                                                    -> c_int;
 
     pub fn secp256k1_ecdsa_recoverable_signature_convert(cx: *const Context, sig: *mut Signature,
-                                                         input: *const RecoverableSignature) 
+                                                         input: *const RecoverableSignature)
                                                          -> c_int;
 
     pub fn secp256k1_ecdsa_signature_normalize(cx: *const Context, out_sig: *mut Signature,
@@ -210,27 +210,6 @@ extern "C" {
                                    sig: *const RecoverableSignature,
                                    msg32: *const c_uchar)
                                    -> c_int;
-
-    // Schnorr
-    pub fn secp256k1_schnorr_sign(cx: *const Context,
-                                  sig64: *mut c_uchar,
-                                  msg32: *const c_uchar,
-                                  sk: *const c_uchar,
-                                  noncefn: NonceFn,
-                                  noncedata: *const c_void)
-                                  -> c_int;
-
-    pub fn secp256k1_schnorr_verify(cx: *const Context,
-                                    sig64: *const c_uchar,
-                                    msg32: *const c_uchar,
-                                    pk: *const PublicKey)
-                                    -> c_int;
-
-    pub fn secp256k1_schnorr_recover(cx: *const Context,
-                                     pk: *mut PublicKey,
-                                     sig64: *const c_uchar,
-                                     msg32: *const c_uchar)
-                                     -> c_int;
 
     // EC
     pub fn secp256k1_ec_seckey_verify(cx: *const Context,
@@ -274,4 +253,3 @@ extern "C" {
                           scalar: *const c_uchar)
                           -> c_int;
 }
-

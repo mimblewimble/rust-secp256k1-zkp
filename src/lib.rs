@@ -57,7 +57,6 @@ pub mod constants;
 pub mod ecdh;
 pub mod ffi;
 pub mod key;
-pub mod schnorr;
 
 /// A tag used for recovering the public key from a compact signature
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
@@ -1047,4 +1046,3 @@ mod benches {
         });
     }
 }
-
