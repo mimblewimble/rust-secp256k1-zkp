@@ -1,4 +1,4 @@
-// Bitcoin secp256k1 bindings
+// Bitcoin secp256k1-zkp bindings
 // Written in 2015 by
 //   Andrew Poelstra
 //
@@ -25,9 +25,9 @@ extern crate gcc;
 
 fn main() {
     let mut base_config = gcc::Config::new();
-    base_config.include("depend/secp256k1/")
-               .include("depend/secp256k1/include")
-               .include("depend/secp256k1/src")
+    base_config.include("depend/secp256k1-zkp/")
+               .include("depend/secp256k1-zkp/include")
+               .include("depend/secp256k1-zkp/src")
                .flag("-g")
                // TODO these three should be changed to use libgmp, at least until secp PR 290 is merged
                .define("USE_NUM_NONE", Some("1"))
@@ -42,9 +42,9 @@ fn main() {
                .define("ENABLE_MODULE_SCHNORR", Some("1"))
                .define("ENABLE_MODULE_RECOVERY", Some("1"));
 
-    // secp256k1
-    base_config.file("depend/secp256k1/contrib/lax_der_parsing.c")
-               .file("depend/secp256k1/src/secp256k1.c")
+    // secp256k1-zkp
+    base_config.file("depend/secp256k1-zkp/contrib/lax_der_parsing.c")
+               .file("depend/secp256k1-zkp/src/secp256k1.c")
                .compile("libsecp256k1.a");
 }
 

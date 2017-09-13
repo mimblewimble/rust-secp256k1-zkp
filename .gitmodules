@@ -1,0 +1,3 @@
+[submodule "depend/secp256k1-zkp"]
+	path = depend/secp256k1-zkp
+	url = https://github.com/mimblewimble/secp256k1-zkp
