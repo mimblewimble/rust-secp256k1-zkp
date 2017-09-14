@@ -327,20 +327,36 @@ impl Secp256k1 {
 		let mut retried = false;
 		let mut proof = [0; constants::MAX_PROOF_SIZE];
 		let mut plen = constants::MAX_PROOF_SIZE as i32;
+		let message = [0u8; 32];
+		let extra_commit = [0u8; 32];
+
 		loop {
 			let err = unsafe {
+
+				// TODO - missing the following params -
+				// message
+				// msg_len
+				// extra_commit
+				// extra_commit_len
+				// gen(erator)
+
 				// because: "This can randomly fail with probability around one in 2^100.
 				// If this happens, buy a lottery ticket and retry."
 				ffi::secp256k1_rangeproof_sign(self.ctx,
-				                               proof.as_mut_ptr(),
-				                               &mut plen,
-				                               min,
-				                               commit.as_ptr(),
-				                               blind.as_ptr(),
-				                               nonce.as_ptr(),
-				                               0,
-				                               64,
-				                               value)
+												proof.as_mut_ptr(),
+												&mut plen,
+												min,
+												commit.as_ptr(),
+												blind.as_ptr(),
+												nonce.as_ptr(),
+												0,
+												64,
+												value,
+												message.as_ptr(),
+												0,
+												extra_commit.as_ptr(),
+												0
+				)
 			};
 			if retried {
 				break;
@@ -438,7 +454,7 @@ impl Secp256k1 {
 		ProofInfo {
 			success: success,
 			value: 0,
-			message: [0; 4096],
+			message: [0; constants::PROOF_MSG_SIZE],
 			mlen: 0,
 			min: min,
 			max: max,
@@ -567,12 +583,14 @@ mod tests {
 
 	#[test]
 	fn test_range_proof() {
-		panic!("TODO - this test will SIGSEGV when run");
+		// panic!("TODO - this test will SIGSEGV when run");
+		panic!("TODO - no more SIGSEGV now we are passing in msg and extra_commit - but it hangs, no gen?");
 		let secp = Secp256k1::with_caps(ContextFlag::Commit);
 		let blinding = SecretKey::new(&secp, &mut OsRng::new().unwrap());
 		let commit = secp.commit(7, blinding).unwrap();
 		let nonce = secp.nonce();
 		let range_proof = secp.range_proof(0, 7, blinding, commit, nonce);
+		panic!("did we SIGSEGV yet? - yes we did, so range_proof is causing it");
 
 		let proof_range = secp.verify_range_proof(commit, range_proof).unwrap();
 

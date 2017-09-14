@@ -320,15 +320,19 @@ extern "C" {
                                        plen: c_int)
                                        -> c_int;
 
-    pub fn secp256k1_rangeproof_sign(ctx: *const Context,
-                                     proof: *mut c_uchar,
-                                     plen: *mut c_int,
-                                     min_value: uint64_t,
-                                     commit: *const c_uchar,
-                                     blind: *const c_uchar,
-                                     nonce: *const c_uchar,
-                                     exp: c_int,
-                                     min_bits: c_int,
-                                     value: uint64_t)
-                                     -> c_int;
+	pub fn secp256k1_rangeproof_sign(ctx: *const Context,
+									proof: *mut c_uchar,
+									plen: *mut c_int,
+									min_value: uint64_t,
+									commit: *const c_uchar,
+									blind: *const c_uchar,
+									nonce: *const c_uchar,
+									exp: c_int,
+									min_bits: c_int,
+									value: uint64_t,
+									message: *const c_uchar,
+									msg_len: c_int,
+									extra_commit: *const c_uchar,
+									extra_commit_len: c_int)
+									-> c_int;
 }
