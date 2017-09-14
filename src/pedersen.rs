@@ -16,6 +16,7 @@
 //! # Pedersen commitments and related range proofs
 
 use std::mem;
+use std::convert;
 
 use ContextFlag;
 use Error;
@@ -71,6 +72,12 @@ impl Clone for RangeProof {
                 plen: self.plen,
             }
         }
+    }
+}
+
+impl AsRef<[u8]> for RangeProof {
+    fn as_ref(&self) -> &[u8] {
+        &self.proof[..self.plen as usize]
     }
 }
 
