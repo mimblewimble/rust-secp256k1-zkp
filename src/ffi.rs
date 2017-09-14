@@ -18,7 +18,7 @@
 //! not be needed for most users.
 use std::mem;
 
-use libc::{c_int, c_uchar, c_uint, c_void, size_t, int64_t, uint64_t};
+use libc::{c_int, c_uchar, c_uint, c_void, size_t, uint64_t};
 
 /// Flag for context to enable no precomputation
 pub const SECP256K1_START_NONE: c_uint = (1 << 0) | 0;
@@ -282,13 +282,12 @@ extern "C" {
                                          -> c_int;
 
     // Takes two list of 33-byte commitments and sums the first set and
-    // subtracts the second and verifies that they sum to excess.
+    // subtracts the second and verifies that they sum to 0.
     pub fn secp256k1_pedersen_verify_tally(ctx: *const Context,
                                            commits: *const *const c_uchar,
                                            pcnt: c_int,
                                            ncommits: *const *const c_uchar,
-                                           ncnt: c_int,
-                                           excess: int64_t)
+                                           ncnt: c_int)
                                            -> c_int;
 
     pub fn secp256k1_rangeproof_info(ctx: *const Context,

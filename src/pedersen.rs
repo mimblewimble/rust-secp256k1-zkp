@@ -247,8 +247,7 @@ impl Secp256k1 {
 	/// expected excess, verifies that it all sums to zero.
 	pub fn verify_commit_sum(&self,
 	                         positive: Vec<Commitment>,
-	                         negative: Vec<Commitment>,
-	                         excess: i64)
+	                         negative: Vec<Commitment>)
 	                         -> bool {
 		let pos = map_vec!(positive, |p| p.0.as_ptr());
 		let neg = map_vec!(negative, |n| n.0.as_ptr());
@@ -257,8 +256,7 @@ impl Secp256k1 {
 			                                     pos.as_ptr(),
 			                                     pos.len() as i32,
 			                                     neg.as_ptr(),
-			                                     neg.len() as i32,
-			                                     excess) == 1
+			                                     neg.len() as i32) == 1
 		}
 	}
 
@@ -466,31 +464,21 @@ mod tests {
         assert!(secp.verify_commit_sum(
             vec![],
             vec![],
-            0
         ));
 
         assert!(secp.verify_commit_sum(
             vec![commit(5)],
             vec![commit(5)],
-            0
-        ));
-
-        assert!(secp.verify_commit_sum(
-            vec![commit(5)],
-            vec![commit(3)],
-            2
         ));
 
         assert!(secp.verify_commit_sum(
             vec![commit(3), commit(2)],
             vec![commit(5)],
-            0
         ));
 
         assert!(secp.verify_commit_sum(
             vec![commit(2), commit(4)],
-            vec![commit(3), commit(2)],
-            1
+            vec![commit(3), commit(3)],
         ));
     }
 
@@ -507,7 +495,6 @@ mod tests {
         assert!(secp.verify_commit_sum(
             vec![commit(5, ONE_KEY)],
             vec![commit(5, ONE_KEY)],
-            0
         ));
 
         // we expect this not to verify
@@ -516,7 +503,6 @@ mod tests {
         assert_eq!(secp.verify_commit_sum(
             vec![commit(3, ONE_KEY), commit(2, ONE_KEY)],
             vec![commit(5, ONE_KEY)],
-            0
         ), false);
 
         // to get these to verify we need to
@@ -525,16 +511,6 @@ mod tests {
         assert!(secp.verify_commit_sum(
             vec![commit(3, ONE_KEY), commit(2, ONE_KEY)],
             vec![commit(5, two_key)],
-            0
-        ));
-
-        // similarly here - with the blinding factors cancelling out
-        // the excess is simply the difference between
-        // the positive values and the negative values
-        assert!(secp.verify_commit_sum(
-            vec![commit(3, ONE_KEY), commit(2, ONE_KEY)],
-            vec![commit(4, two_key)],
-            1
         ));
     }
 
@@ -547,11 +523,6 @@ mod tests {
             secp.commit(value, blinding).unwrap()
         }
 
-        fn commit_value(value: u64) -> Commitment {
-            let secp = Secp256k1::with_caps(ContextFlag::Commit);
-            secp.commit_value(value).unwrap()
-        }
-
         let blind_pos = SecretKey::new(&secp, &mut OsRng::new().unwrap());
         let blind_neg = SecretKey::new(&secp, &mut OsRng::new().unwrap());
 
@@ -561,28 +532,6 @@ mod tests {
         assert!(secp.verify_commit_sum(
             vec![commit(5, blind_pos)],
             vec![commit(3, blind_neg), commit(2, blind_sum)],
-            0
-        ));
-
-        assert!(secp.verify_commit_sum(
-            vec![commit(6, blind_pos)],
-            vec![commit(3, blind_neg), commit(2, blind_sum)],
-            1
-        ));
-
-        assert!(secp.verify_commit_sum(
-            vec![commit(5, blind_pos)],
-            vec![commit(4, blind_neg), commit(2, blind_sum)],
-            -1
-        ));
-
-        // now a more realistic example
-        // blinding factors net out,
-        // values net out except for a single excess commitment (with zero blinding factor)
-        assert!(secp.verify_commit_sum(
-            vec![commit(5, blind_pos), commit_value(1001)],
-            vec![commit(3, blind_neg), commit(2, blind_sum)],
-            1001
         ));
     }
 }
