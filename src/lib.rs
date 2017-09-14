@@ -23,7 +23,7 @@
 #![crate_type = "lib"]
 #![crate_type = "rlib"]
 #![crate_type = "dylib"]
-#![crate_name = "secp256k1"]
+#![crate_name = "secp256k1zkp"]
 
 // Coding conventions
 #![deny(non_upper_case_globals)]
