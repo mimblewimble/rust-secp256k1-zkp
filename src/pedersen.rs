@@ -163,6 +163,7 @@ impl RangeProof {
 }
 
 /// The range that was proven
+#[derive(Debug)]
 pub struct ProofRange {
 	/// Min value that was proven
 	pub min: u64,
@@ -304,6 +305,15 @@ impl Secp256k1 {
 		SecretKey::from_slice(self, &ret)
 	}
 
+    /// Convenience function for generating a random nonce for a range proof.
+    /// We will need the nonce later if we want to rewind the range proof.
+    pub fn nonce(&self) -> [u8; 32] {
+        let mut rng = OsRng::new().unwrap();
+        let mut nonce = [0u8; 32];
+        rng.fill_bytes(&mut nonce);
+        nonce
+    }
+
 	/// Produces a range proof for the provided value, using min and max
 	/// bounds, relying
 	/// on the blinding factor and commitment.
@@ -311,13 +321,9 @@ impl Secp256k1 {
 	                   min: u64,
 	                   value: u64,
 	                   blind: SecretKey,
-	                   commit: Commitment)
+	                   commit: Commitment,
+                       nonce: [u8; 32])
 	                   -> RangeProof {
-
-		let mut rng = OsRng::new().unwrap();
-		let mut nonce = [0u8; 32];
-		rng.fill_bytes(&mut nonce);
-
 		let mut retried = false;
 		let mut proof = [0; constants::MAX_PROOF_SIZE];
 		let mut plen = constants::MAX_PROOF_SIZE as i32;
