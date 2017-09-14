@@ -18,7 +18,7 @@
 //! not be needed for most users.
 use std::mem;
 
-use libc::{c_int, c_uchar, c_uint, c_void, size_t};
+use libc::{c_int, c_uchar, c_uint, c_void, size_t, int64_t, uint64_t};
 
 /// Flag for context to enable no precomputation
 pub const SECP256K1_START_NONE: c_uint = (1 << 0) | 0;
@@ -245,4 +245,84 @@ extern "C" {
                           point: *const PublicKey,
                           scalar: *const c_uchar)
                           -> c_int;
+
+    // Generates a pedersen commitment: *commit = blind * G + value * G2.
+    // The commitment is 33 bytes, the blinding factor is 32 bytes.
+    pub fn secp256k1_pedersen_commit(ctx: *const Context,
+                                     commit: *mut c_uchar,
+                                     blind: *const c_uchar,
+                                     value: uint64_t)
+                                     -> c_int;
+
+    // Takes a list of n pointers to 32 byte blinding values, the first negs
+    // of which are treated with positive sign and the rest negative, then
+    // calculates an additional blinding value that adds to zero.
+    pub fn secp256k1_pedersen_blind_sum(ctx: *const Context,
+                                        blind_out: *const c_uchar,
+                                        blinds: *const *const c_uchar,
+                                        n: c_int,
+                                        npositive: c_int)
+                                        -> c_int;
+
+    // Takes two list of 33-byte commitments and sums the first set, subtracts
+    // the second and returns the resulting commitment.
+    pub fn secp256k1_pedersen_commit_sum(ctx: *const Context,
+                                         commit_out: *const c_uchar,
+                                         commits: *const *const c_uchar,
+                                         pcnt: c_int,
+                                         ncommits: *const *const c_uchar,
+                                         ncnt: c_int)
+                                         -> c_int;
+
+    // Takes two list of 33-byte commitments and sums the first set and
+    // subtracts the second and verifies that they sum to excess.
+    pub fn secp256k1_pedersen_verify_tally(ctx: *const Context,
+                                           commits: *const *const c_uchar,
+                                           pcnt: c_int,
+                                           ncommits: *const *const c_uchar,
+                                           ncnt: c_int,
+                                           excess: int64_t)
+                                           -> c_int;
+
+    pub fn secp256k1_rangeproof_info(ctx: *const Context,
+                                     exp: *mut c_int,
+                                     mantissa: *mut c_int,
+                                     min_value: *mut uint64_t,
+                                     max_value: *mut uint64_t,
+                                     proof: *const c_uchar,
+                                     plen: c_int)
+                                     -> c_int;
+
+    pub fn secp256k1_rangeproof_rewind(ctx: *const Context,
+                                       blind_out: *mut c_uchar,
+                                       value_out: *mut uint64_t,
+                                       message_out: *mut c_uchar,
+                                       outlen: *mut c_int,
+                                       nonce: *const c_uchar,
+                                       min_value: *mut uint64_t,
+                                       max_value: *mut uint64_t,
+                                       commit: *const c_uchar,
+                                       proof: *const c_uchar,
+                                       plen: c_int)
+                                       -> c_int;
+
+    pub fn secp256k1_rangeproof_verify(ctx: *const Context,
+                                       min_value: &mut uint64_t,
+                                       max_value: &mut uint64_t,
+                                       commit: *const c_uchar,
+                                       proof: *const c_uchar,
+                                       plen: c_int)
+                                       -> c_int;
+
+    pub fn secp256k1_rangeproof_sign(ctx: *const Context,
+                                     proof: *mut c_uchar,
+                                     plen: *mut c_int,
+                                     min_value: uint64_t,
+                                     commit: *const c_uchar,
+                                     blind: *const c_uchar,
+                                     nonce: *const c_uchar,
+                                     exp: c_int,
+                                     min_bits: c_int,
+                                     value: uint64_t)
+                                     -> c_int;
 }
