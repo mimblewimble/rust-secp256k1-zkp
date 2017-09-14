@@ -240,6 +240,14 @@ macro_rules! impl_raw_debug {
      }
 }
 
+macro_rules! map_vec {
+  ($thing:expr, $mapfn:expr ) => {
+    $thing.iter()
+      .map($mapfn)
+      .collect::<Vec<_>>();
+  }
+}
+
 #[cfg(test)]
 // A macro useful for serde (de)serialization tests
 macro_rules! round_trip_serde (

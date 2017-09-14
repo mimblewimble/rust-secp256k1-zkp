@@ -57,6 +57,7 @@ pub mod constants;
 pub mod ecdh;
 pub mod ffi;
 pub mod key;
+pub mod pedersen;
 
 /// A tag used for recovering the public key from a compact signature
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
@@ -418,6 +419,10 @@ pub enum Error {
     InvalidSecretKey,
     /// Bad recovery id
     InvalidRecoveryId,
+    /// Summing commitments led to incorrect result
+    IncorrectCommitSum,
+    /// Range proof is invalid
+    InvalidRangeProof,
 }
 
 // Passthrough Debug to Display, since errors should be user-visible
@@ -438,7 +443,9 @@ impl error::Error for Error {
             Error::InvalidPublicKey => "secp: malformed public key",
             Error::InvalidSignature => "secp: malformed signature",
             Error::InvalidSecretKey => "secp: malformed or out-of-range secret key",
-            Error::InvalidRecoveryId => "secp: bad recovery id"
+            Error::InvalidRecoveryId => "secp: bad recovery id",
+            Error::IncorrectCommitSum => "secp: invalid pedersen commitment sum",
+            Error::InvalidRangeProof => "secp: invalid range proof",
         }
     }
 }
@@ -464,7 +471,9 @@ pub enum ContextFlag {
     /// Can verify but not create signatures
     VerifyOnly,
     /// Can verify and create signatures
-    Full
+    Full,
+    /// Can do all of the above plus pedersen commitments
+    Commit,
 }
 
 // Passthrough Debug to Display, since caps should be user-visible
@@ -513,7 +522,9 @@ impl Secp256k1 {
             ContextFlag::None => ffi::SECP256K1_START_NONE,
             ContextFlag::SignOnly => ffi::SECP256K1_START_SIGN,
             ContextFlag::VerifyOnly => ffi::SECP256K1_START_VERIFY,
-            ContextFlag::Full => ffi::SECP256K1_START_SIGN | ffi::SECP256K1_START_VERIFY
+            ContextFlag::Full | ContextFlag::Commit => {
+                ffi::SECP256K1_START_SIGN | ffi::SECP256K1_START_VERIFY
+            }
         };
         Secp256k1 { ctx: unsafe { ffi::secp256k1_context_create(flag) }, caps: caps }
     }

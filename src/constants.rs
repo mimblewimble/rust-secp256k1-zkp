@@ -38,6 +38,15 @@ pub const MAX_SIGNATURE_SIZE: usize = 72;
 /// The maximum size of a compact signature
 pub const COMPACT_SIGNATURE_SIZE: usize = 64;
 
+/// The size of a Pedersen commitment
+pub const PEDERSEN_COMMITMENT_SIZE: usize = 33;
+
+/// The max size of a range proof
+pub const MAX_PROOF_SIZE: usize = 5134;
+
+/// The maximum size of a message embedded in a range proof
+pub const PROOF_MSG_SIZE: usize = 4096;
+
 /// The order of the secp256k1 curve
 pub const CURVE_ORDER: [u8; 32] = [
     0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
