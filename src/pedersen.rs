@@ -457,14 +457,6 @@ mod tests {
 
     use rand::os::OsRng;
 
-	#[test]
-	/// TODO - this is failing right now as secp256k1_pedersen_commit_sum is missing from main_impl.h
-	/// Check that we can call commit_sum which itself calls secp256k1_pedersen_commit_sum
-	fn test_commit_sum() {
-		let secp = Secp256k1::with_caps(ContextFlag::Commit);
-		secp.commit_sum(vec![], vec![]).unwrap();
-	}
-
     #[test]
     fn test_verify_commit_sum_zero_keys() {
         let secp = Secp256k1::with_caps(ContextFlag::Commit);
@@ -547,5 +539,68 @@ mod tests {
             vec![commit(5, blind_pos)],
             vec![commit(3, blind_neg), commit(2, blind_sum)],
         ));
+    }
+
+    #[test]
+    fn test_commit_sum() {
+        let secp = Secp256k1::with_caps(ContextFlag::Commit);
+
+        fn commit(value: u64, blinding: SecretKey) -> Commitment {
+            let secp = Secp256k1::with_caps(ContextFlag::Commit);
+            secp.commit(value, blinding).unwrap()
+        }
+
+        let blind_a = SecretKey::new(&secp, &mut OsRng::new().unwrap());
+        let blind_b = SecretKey::new(&secp, &mut OsRng::new().unwrap());
+
+        let commit_a = commit(3, blind_a);
+        let commit_b = commit(2, blind_b);
+
+        let blind_c = secp.blind_sum(vec![blind_a, blind_b], vec![]).unwrap();
+
+        let commit_c = commit(3 + 2, blind_c);
+
+        let commit_d = secp.commit_sum(vec![commit_a, commit_b], vec![]).unwrap();
+        assert_eq!(commit_c, commit_d);
+    }
+
+    #[test]
+    fn test_range_proof() {
+        let secp = Secp256k1::with_caps(ContextFlag::Commit);
+        let blinding = SecretKey::new(&secp, &mut OsRng::new().unwrap());
+
+        let commit = secp.commit(7, blinding).unwrap();
+        let nonce = secp.nonce();
+        let range_proof = secp.range_proof(0, 7, blinding, commit, nonce);
+        let proof_range = secp.verify_range_proof(commit, range_proof).unwrap();
+
+        assert_eq!(proof_range.min, 0);
+
+        let proof_info = secp.range_proof_info(range_proof);
+        assert!(proof_info.success);
+        assert_eq!(proof_info.min, 0);
+        // check we get no information back for the value here
+        assert_eq!(proof_info.value, 0);
+
+        let proof_info = secp.rewind_range_proof(commit, range_proof, nonce);
+        assert!(proof_info.success);
+        assert_eq!(proof_info.min, 0);
+        assert_eq!(proof_info.value, 7);
+
+        // check we cannot rewind a range proof without the original nonce
+        let bad_nonce = secp.nonce();
+        let bad_info = secp.rewind_range_proof(commit, range_proof, bad_nonce);
+        assert_eq!(bad_info.success, false);
+        assert_eq!(bad_info.value, 0);
+
+        // check we can construct and verify a range proof on value 0
+        let commit = secp.commit(0, blinding).unwrap();
+        let nonce = secp.nonce();
+        let range_proof = secp.range_proof(0, 0, blinding, commit, nonce);
+        secp.verify_range_proof(commit, range_proof).unwrap();
+        let proof_info = secp.rewind_range_proof(commit, range_proof, nonce);
+        assert!(proof_info.success);
+        assert_eq!(proof_info.min, 0);
+        assert_eq!(proof_info.value, 0);
     }
 }
