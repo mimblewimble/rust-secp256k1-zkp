@@ -16,7 +16,6 @@
 //! # Pedersen commitments and related range proofs
 
 use std::mem;
-use std::convert;
 
 use ContextFlag;
 use Error;
@@ -25,7 +24,7 @@ use Secp256k1;
 use constants;
 use ffi;
 use key;
-use key::{SecretKey, PublicKey};
+use key::SecretKey;
 use rand::{Rng, OsRng};
 
 /// A Pedersen commitment
@@ -41,10 +40,6 @@ impl Commitment {
     /// Converts a commitment to a public key
     pub fn to_pubkey(&self, secp: &Secp256k1) -> Result<key::PublicKey, Error> {
         key::PublicKey::from_slice(secp, &self.0)
-    }
-    /// Underlying data
-    pub fn bytes(&self) -> &[u8] {
-        &self.0
     }
 }
 
@@ -82,9 +77,11 @@ impl AsRef<[u8]> for RangeProof {
 }
 
 impl RangeProof {
+    /// The range proof as a byte slice.
     pub fn bytes(&self) -> &[u8] {
         &self.proof[..self.plen as usize]
     }
+    /// Length of the range proof in bytes.
     pub fn len(&self) -> usize {
         self.plen
     }
@@ -326,6 +323,8 @@ impl Secp256k1 {
         }
     }
 
+    /// General information extracted from a range proof. Does not provide any
+    /// information about the value or the message (see rewind).
     pub fn range_proof_info(&self, proof: RangeProof) -> ProofInfo {
         let mut exp: i32 = 0;
         let mut mantissa: i32 = 0;
