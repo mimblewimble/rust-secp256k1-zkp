@@ -457,6 +457,14 @@ mod tests {
 
     use rand::os::OsRng;
 
+	#[test]
+	/// TODO - this is failing right now as secp256k1_pedersen_commit_sum is missing from main_impl.h
+	/// Check that we can call commit_sum which itself calls secp256k1_pedersen_commit_sum
+	fn test_commit_sum() {
+		let secp = Secp256k1::with_caps(ContextFlag::Commit);
+		secp.commit_sum(vec![], vec![]).unwrap();
+	}
+
     #[test]
     fn test_verify_commit_sum_zero_keys() {
         let secp = Secp256k1::with_caps(ContextFlag::Commit);
