@@ -646,6 +646,13 @@ mod tests {
 
 		let commit_d = secp.commit_sum(vec![commit_a, commit_b], vec![]).unwrap();
 		assert_eq!(commit_c, commit_d);
+
+		let blind_e = secp.blind_sum(vec![blind_a], vec![blind_b]).unwrap();
+
+		let commit_e = commit(3 - 2, blind_e);
+
+		let commit_f = secp.commit_sum(vec![commit_a], vec![commit_b]).unwrap();
+		assert_eq!(commit_e, commit_f);
 	}
 
 	#[test]
