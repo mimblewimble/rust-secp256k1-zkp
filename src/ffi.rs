@@ -134,8 +134,8 @@ extern "C" {
                                      -> c_int;
 
     pub fn secp256k1_ec_pubkey_serialize(cx: *const Context, output: *const c_uchar,
-                                         out_len: *mut size_t, pk: *const PublicKey
-,                                        compressed: c_uint)
+                                         out_len: *mut size_t, pk: *const PublicKey,
+                                         compressed: c_uint)
                                          -> c_int;
 
     // Signatures

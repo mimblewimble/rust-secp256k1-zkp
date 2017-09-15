@@ -53,9 +53,17 @@ impl Commitment {
 		mem::uninitialized()
 	}
 
+	/// TODO - secp needs an API to safely convert a commitment to a public key
+	/// TODO - for now we can (pretend you didn't see this, and) set the first byte to 0x02
 	/// Converts a commitment to a public key
 	pub fn to_pubkey(&self, secp: &Secp256k1) -> Result<key::PublicKey, Error> {
-		key::PublicKey::from_slice(secp, &self.0)
+		let mut pk = [0; constants::COMPRESSED_PUBLIC_KEY_SIZE];
+		for i in 0..self.0.len() {
+			pk[i] = self.0[i];
+		}
+		// @apoealstra "recommended" we could do this temporarily
+		pk[0] = 0x02;
+		key::PublicKey::from_slice(secp, &pk)
 	}
 }
 
