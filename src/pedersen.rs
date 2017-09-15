@@ -60,13 +60,15 @@ impl Commitment {
 	pub fn to_pubkey(&self, secp: &Secp256k1) -> Result<key::PublicKey, Error> {
 		let mut pk = [0; constants::COMPRESSED_PUBLIC_KEY_SIZE];
 		for i in 0..self.0.len() {
-			if self.0[i] == 0x08 {
-				pk[i] = 0x02;
+			if i == 0 {
+				if self.0[i] == 0x08 {
+					pk[i] = 0x02;
+				} else {
+					pk[i] = 0x03;
+				}
 			} else {
-				pk[i] = 0x03;
+				pk[i] = self.0[i];
 			}
-		} else {
-			pk[i] = self.0[i];
 		}
 		key::PublicKey::from_slice(secp, &pk)
 	}
