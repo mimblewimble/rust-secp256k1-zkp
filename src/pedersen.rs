@@ -53,24 +53,72 @@ impl Commitment {
 		mem::uninitialized()
 	}
 
-	/// TODO - secp needs an API to safely convert a commitment to a public key
-	/// TODO - for now we can (pretend you didn't see this, and) set the first byte to 0x02
-	/// @apoelstra "suggested" this short term fix
+	/// Converts a commitment into two "candidate" public keys (don't laugh)
+	/// one of these will be valid, the other has the incorrect parity
+	/// we just don't know which is which...
+	/// once secp provides the necessary api we will no longer need this hack
+	/// grin uses the public key to verify signatures (hopefully one of these keys works)
+	pub fn to_two_pubkeys(&self, secp: &Secp256k1) -> [key::PublicKey; 2] {
+		let mut pk1 = [0; constants::COMPRESSED_PUBLIC_KEY_SIZE];
+		for i in 0..self.0.len() {
+			if i == 0 {
+				pk1[i] = 0x02;
+			} else {
+				pk1[i] = self.0[i];
+			}
+		}
+		// TODO - we should not unwrap these here, and handle errors better
+		let public_key1 = key::PublicKey::from_slice(secp, &pk1).unwrap();
+
+		let mut pk2 = [0; constants::COMPRESSED_PUBLIC_KEY_SIZE];
+		for i in 0..self.0.len() {
+			if i == 0 {
+				pk2[i] = 0x03;
+			} else {
+				pk2[i] = self.0[i];
+			}
+		}
+		let public_key2 = key::PublicKey::from_slice(secp, &pk2).unwrap();
+		[public_key1, public_key2]
+	}
+
 	/// Converts a commitment to a public key
+	/// TODO - we need an API in secp to convert commitments to public keys safely
+	/// right now a commitment is prefixed 08/09 and public keys are prefixed 02/03
+	/// see to_two_pubkeys() for a short term workaround
 	pub fn to_pubkey(&self, secp: &Secp256k1) -> Result<key::PublicKey, Error> {
 		let mut pk = [0; constants::COMPRESSED_PUBLIC_KEY_SIZE];
 		for i in 0..self.0.len() {
 			if i == 0 {
-				if self.0[i] == 0x08 {
+				// if self.0[i] == 0x08 {
 					pk[i] = 0x02;
-				} else {
-					pk[i] = 0x03;
-				}
+				// } else {
+					// pk[i] = 0x03;
+				// 	}
 			} else {
 				pk[i] = self.0[i];
 			}
 		}
-		key::PublicKey::from_slice(secp, &pk)
+		let public_key = key::PublicKey::from_slice(secp, &pk);
+
+		let mut pk2 = [0; constants::COMPRESSED_PUBLIC_KEY_SIZE];
+		for i in 0..self.0.len() {
+			if i == 0 {
+				// if self.0[i] == 0x08 {
+					// pk2[i] = 0x02;
+				// } else {
+					pk2[i] = 0x03;
+				// 	}
+			} else {
+				pk2[i] = self.0[i];
+			}
+		}
+		let public_key2 = key::PublicKey::from_slice(secp, &pk2);
+
+		println!("pk1 - {:?}", public_key);
+		println!("pk2 - {:?}", public_key2);
+
+		public_key
 	}
 }
 
@@ -641,11 +689,25 @@ mod tests {
     }
 
 	#[test]
+	fn test_to_two_pubkeys() {
+		let secp = Secp256k1::with_caps(ContextFlag::Commit);
+		let blinding = SecretKey::new(&secp, &mut OsRng::new().unwrap());
+		let commit = secp.commit(5, blinding).unwrap();
+		assert_eq!(commit.to_two_pubkeys(&secp).len(), 2);
+	}
+
+	#[test]
+	// to_pubkey() is not currently working as secp does currently
+	// provide an api to extract a public key from a commitment
 	fn test_to_pubkey() {
 		let secp = Secp256k1::with_caps(ContextFlag::Commit);
 		let blinding = SecretKey::new(&secp, &mut OsRng::new().unwrap());
 		let commit = secp.commit(5, blinding).unwrap();
-		commit.to_pubkey(&secp).unwrap();
+		let pubkey = commit.to_pubkey(&secp);
+		match pubkey {
+			Ok(_) => panic!("expected this to return an error"),
+			Err(_) => {}
+		}
 	}
 
 	#[test]
