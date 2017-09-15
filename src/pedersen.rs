@@ -626,6 +626,14 @@ mod tests {
     }
 
 	#[test]
+	fn test_to_pubkey() {
+		let secp = Secp256k1::with_caps(ContextFlag::Commit);
+		let blinding = SecretKey::new(&secp, &mut OsRng::new().unwrap());
+		let commit = secp.commit(5, blinding).unwrap();
+		commit.to_pubkey(&secp).unwrap();
+	}
+
+	#[test]
 	fn test_commit_sum() {
 		let secp = Secp256k1::with_caps(ContextFlag::Commit);
 
