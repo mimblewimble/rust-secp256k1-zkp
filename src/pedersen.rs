@@ -18,6 +18,7 @@
 use std::cmp::min;
 use std::fmt;
 use std::mem;
+use libc::size_t;
 
 use ContextFlag;
 use Error;
@@ -223,9 +224,18 @@ impl Secp256k1 {
 			return Err(Error::IncapableContext);
 		}
 		let mut commit = [0; 33];
+
+		// TODO - what do we need to be passing in here as the generator?
+		let gen = self.generator_h();
+
 		unsafe {
-			ffi::secp256k1_pedersen_commit(self.ctx, commit.as_mut_ptr(), blind.as_ptr(), value)
-		};
+			ffi::secp256k1_pedersen_commit(
+				self.ctx,
+				commit.as_mut_ptr(),
+				blind.as_ptr(),
+				value,
+				gen.as_ptr(),
+			)};
 		Ok(Commitment(commit))
 	}
 
@@ -238,44 +248,59 @@ impl Secp256k1 {
 		}
 		let mut commit = [0; 33];
 		let zblind = [0; 32];
+
+		// TODO - what do we need to be passing in here as the generator?
+		let gen = self.generator_h();
+
 		unsafe {
-			ffi::secp256k1_pedersen_commit(self.ctx, commit.as_mut_ptr(), zblind.as_ptr(), value)
-		};
+			ffi::secp256k1_pedersen_commit(
+				self.ctx,
+				commit.as_mut_ptr(),
+				zblind.as_ptr(),
+				value,
+				gen.as_ptr(),
+			)};
 		Ok(Commitment(commit))
 	}
 
 	/// Taking vectors of positive and negative commitments as well as an
 	/// expected excess, verifies that it all sums to zero.
-	pub fn verify_commit_sum(&self,
-	                         positive: Vec<Commitment>,
-	                         negative: Vec<Commitment>)
-	                         -> bool {
+	pub fn verify_commit_sum(
+		&self,
+		positive: Vec<Commitment>,
+		negative: Vec<Commitment>
+	) -> bool {
 		let pos = map_vec!(positive, |p| p.0.as_ptr());
 		let neg = map_vec!(negative, |n| n.0.as_ptr());
 		unsafe {
-			ffi::secp256k1_pedersen_verify_tally(self.ctx,
-			                                     pos.as_ptr(),
-			                                     pos.len() as i32,
-			                                     neg.as_ptr(),
-			                                     neg.len() as i32) == 1
+			ffi::secp256k1_pedersen_verify_tally(
+				self.ctx,
+				pos.as_ptr(),
+				pos.len() as size_t,
+				neg.as_ptr(),
+				neg.len() as size_t,
+			) == 1
 		}
 	}
 
 	/// Computes the sum of multiple positive and negative pedersen commitments.
-	pub fn commit_sum(&self,
-	                  positive: Vec<Commitment>,
-	                  negative: Vec<Commitment>)
-	                  -> Result<Commitment, Error> {
+	pub fn commit_sum(
+		&self,
+		positive: Vec<Commitment>,
+		negative: Vec<Commitment>
+	) -> Result<Commitment, Error> {
 		let pos = map_vec!(positive, |p| p.0.as_ptr());
 		let neg = map_vec!(negative, |n| n.0.as_ptr());
 		let mut ret = unsafe { Commitment::blank() };
 		let err = unsafe {
-			ffi::secp256k1_pedersen_commit_sum(self.ctx,
-			                                   ret.as_mut_ptr(),
-			                                   pos.as_ptr(),
-			                                   pos.len() as i32,
-			                                   neg.as_ptr(),
-			                                   neg.len() as i32)
+			ffi::secp256k1_pedersen_commit_sum(
+				self.ctx,
+				ret.as_mut_ptr(),
+				pos.as_ptr(),
+				pos.len() as size_t,
+				neg.as_ptr(),
+				neg.len() as size_t,
+			)
 		};
 		if err == 1 {
 			Ok(ret)
@@ -285,83 +310,97 @@ impl Secp256k1 {
 	}
 
 	/// Computes the sum of multiple positive and negative blinding factors.
-	pub fn blind_sum(&self,
-	                 positive: Vec<SecretKey>,
-	                 negative: Vec<SecretKey>)
-	                 -> Result<SecretKey, Error> {
+	pub fn blind_sum(
+		&self,
+		positive: Vec<SecretKey>,
+		negative: Vec<SecretKey>
+	) -> Result<SecretKey, Error> {
 		let mut neg = map_vec!(negative, |n| n.as_ptr());
 		let mut all = map_vec!(positive, |p| p.as_ptr());
 		all.append(&mut neg);
 		let mut ret: [u8; 32] = unsafe { mem::uninitialized() };
 		unsafe {
-			assert_eq!(ffi::secp256k1_pedersen_blind_sum(self.ctx,
-                                                         ret.as_mut_ptr(),
-                                                         all.as_ptr(),
-                                                         all.len() as i32,
-                                                         positive.len() as i32),
-                       1)
+			assert_eq!(
+				ffi::secp256k1_pedersen_blind_sum(
+				self.ctx,
+				ret.as_mut_ptr(),
+				all.as_ptr(),
+				all.len() as size_t,
+				positive.len() as size_t,
+			), 1);
 		}
 		// secp256k1 should never return an invalid private
 		SecretKey::from_slice(self, &ret)
 	}
 
-    /// Convenience function for generating a random nonce for a range proof.
-    /// We will need the nonce later if we want to rewind the range proof.
-    pub fn nonce(&self) -> [u8; 32] {
-        let mut rng = OsRng::new().unwrap();
-        let mut nonce = [0u8; 32];
-        rng.fill_bytes(&mut nonce);
-        nonce
-    }
+	/// Convenience function for generating a random nonce for a range proof.
+	/// We will need the nonce later if we want to rewind the range proof.
+	pub fn nonce(&self) -> [u8; 32] {
+	    let mut rng = OsRng::new().unwrap();
+	    let mut nonce = [0u8; 32];
+	    rng.fill_bytes(&mut nonce);
+	    nonce
+	}
+
+	// I have no idea what I'm doing but cribbing this from secp256k1-zkp seems to have
+	// cleaned up some of the test failures...
+	fn generator_h(&self) -> [u8; 33] {
+		[
+			0x11,
+			0x50, 0x92, 0x9b, 0x74, 0xc1, 0xa0, 0x49, 0x54, 0xb7, 0x8b, 0x4b, 0x60, 0x35, 0xe9, 0x7a, 0x5e,
+			0x07, 0x8a, 0x5a, 0x0f, 0x28, 0xec, 0x96, 0xd5, 0x47, 0xbf, 0xee, 0x9a, 0xce, 0x80, 0x3a, 0xc0
+		]
+	}
 
 	/// Produces a range proof for the provided value, using min and max
 	/// bounds, relying
 	/// on the blinding factor and commitment.
-	pub fn range_proof(&self,
-	                   min: u64,
-	                   value: u64,
-	                   blind: SecretKey,
-	                   commit: Commitment,
-                       nonce: [u8; 32])
-	                   -> RangeProof {
+	pub fn range_proof(
+		&self,
+		min: u64,
+		value: u64,
+		blind: SecretKey,
+		commit: Commitment,
+		nonce: [u8; 32]
+	) -> RangeProof {
 		let mut retried = false;
 		let mut proof = [0; constants::MAX_PROOF_SIZE];
-		let mut plen = constants::MAX_PROOF_SIZE as i32;
+		let mut plen = constants::MAX_PROOF_SIZE as size_t;
 		let message = [0u8; 32];
-		let extra_commit = [0u8; 32];
 
+		let extra_commit = [0u8; 33];
+		let gen = self.generator_h();
+
+		// TODO - confirm this reworked retry logic works as expected
+		// pretty sure the original approach retried on success (so twice in total)
+		// and just kept looping forever on error
 		loop {
-			let err = unsafe {
-
-				// TODO - missing the following params -
-				// message
-				// msg_len
-				// extra_commit
-				// extra_commit_len
-				// gen(erator)
-
+			let success = unsafe {
 				// because: "This can randomly fail with probability around one in 2^100.
 				// If this happens, buy a lottery ticket and retry."
-				ffi::secp256k1_rangeproof_sign(self.ctx,
-												proof.as_mut_ptr(),
-												&mut plen,
-												min,
-												commit.as_ptr(),
-												blind.as_ptr(),
-												nonce.as_ptr(),
-												0,
-												64,
-												value,
-												message.as_ptr(),
-												0,
-												extra_commit.as_ptr(),
-												0
-				)
+				ffi::secp256k1_rangeproof_sign(
+					self.ctx,
+					proof.as_mut_ptr(),
+					&mut plen,
+					min,
+					commit.as_ptr(),
+					blind.as_ptr(),
+					nonce.as_ptr(),
+					0,
+					64,
+					value,
+					message.as_ptr(),
+					0 as size_t,
+					extra_commit.as_ptr(),
+					0 as size_t,
+					gen.as_ptr(),
+				) == 1
 			};
-			if retried {
+			// break out of the loop immeidately on success or
+			// or on the 2nd attempt if we retried
+			if success || retried {
 				break;
-			}
-			if err == 1 {
+			} else {
 				retried = true;
 			}
 		}
@@ -372,21 +411,31 @@ impl Secp256k1 {
 	}
 
 	/// Verify a proof that a committed value is within a range.
-	pub fn verify_range_proof(&self,
-	                          commit: Commitment,
-	                          proof: RangeProof)
-	                          -> Result<ProofRange, Error> {
+	pub fn verify_range_proof(
+		&self,
+		commit: Commitment,
+		proof: RangeProof
+	) -> Result<ProofRange, Error> {
 		let mut min: u64 = 0;
 		let mut max: u64 = 0;
 
+		let extra_commit = [0u8; 33];
+		let gen = self.generator_h();
+
 		let success = unsafe {
-			ffi::secp256k1_rangeproof_verify(self.ctx,
-			                                 &mut min,
-			                                 &mut max,
-			                                 commit.as_ptr(),
-			                                 proof.proof.as_ptr(),
-			                                 proof.plen as i32) == 1
+			ffi::secp256k1_rangeproof_verify(
+				self.ctx,
+				&mut min,
+				&mut max,
+				commit.as_ptr(),
+				proof.proof.as_ptr(),
+				proof.plen as size_t,
+				extra_commit.as_ptr(),
+				0 as size_t,
+				gen.as_ptr(),
+			 ) == 1
 		};
+
 		if success {
 			Ok(ProofRange {
 				min: min,
@@ -397,37 +446,47 @@ impl Secp256k1 {
 		}
 	}
 
-	/// Verify a range proof proof and rewind the proof to recover information
+	/// Verify a range proof and rewind the proof to recover information
 	/// sent by its author.
-	pub fn rewind_range_proof(&self,
-	                          commit: Commitment,
-	                          proof: RangeProof,
-	                          nonce: [u8; 32])
-	                          -> ProofInfo {
+	pub fn rewind_range_proof(
+		&self,
+		commit: Commitment,
+		proof: RangeProof,
+		nonce: [u8; 32]
+	) -> ProofInfo {
 		let mut value: u64 = 0;
 		let mut blind: [u8; 32] = unsafe { mem::uninitialized() };
 		let mut message = [0u8; constants::PROOF_MSG_SIZE];
-		let mut mlen: i32 = 0;
+		let mut mlen: size_t = 0;
 		let mut min: u64 = 0;
 		let mut max: u64 = 0;
+
+		let extra_commit = [0u8; 33];
+		let gen = self.generator_h();
+
 		let success = unsafe {
-			ffi::secp256k1_rangeproof_rewind(self.ctx,
-			                                 blind.as_mut_ptr(),
-			                                 &mut value,
-			                                 message.as_mut_ptr(),
-			                                 &mut mlen,
-			                                 nonce.as_ptr(),
-			                                 &mut min,
-			                                 &mut max,
-			                                 commit.as_ptr(),
-			                                 proof.proof.as_ptr(),
-			                                 proof.plen as i32) == 1
+			ffi::secp256k1_rangeproof_rewind(
+				self.ctx,
+				blind.as_mut_ptr(),
+				&mut value,
+				message.as_mut_ptr(),
+				&mut mlen,
+				nonce.as_ptr(),
+				&mut min,
+				&mut max,
+				commit.as_ptr(),
+				proof.proof.as_ptr(),
+				proof.plen as size_t,
+				extra_commit.as_ptr(),
+				0 as size_t,
+				gen.as_ptr(),
+			) == 1
 		};
 		ProofInfo {
 			success: success,
 			value: value,
 			message: message,
-			mlen: mlen,
+			mlen: mlen as i32,
 			min: min,
 			max: max,
 			exp: 0,
@@ -442,14 +501,23 @@ impl Secp256k1 {
 		let mut mantissa: i32 = 0;
 		let mut min: u64 = 0;
 		let mut max: u64 = 0;
+
+		let extra_commit = [0u8; 33];
+		let gen = self.generator_h();
+
 		let success = unsafe {
-			ffi::secp256k1_rangeproof_info(self.ctx,
-			                               &mut exp,
-			                               &mut mantissa,
-			                               &mut min,
-			                               &mut max,
-			                               proof.proof.as_ptr(),
-			                               proof.plen as i32) == 1
+			ffi::secp256k1_rangeproof_info(
+				self.ctx,
+				&mut exp,
+				&mut mantissa,
+				&mut min,
+				&mut max,
+				proof.proof.as_ptr(),
+				proof.plen as size_t,
+				extra_commit.as_ptr(),
+				0 as size_t,
+				gen.as_ptr(),
+			) == 1
 		};
 		ProofInfo {
 			success: success,
@@ -500,7 +568,7 @@ mod tests {
 
         assert!(secp.verify_commit_sum(
             vec![commit(2), commit(4)],
-            vec![commit(3), commit(3)],
+            vec![commit(1), commit(5)],
         ));
     }
 
@@ -552,8 +620,8 @@ mod tests {
         let blind_sum = secp.blind_sum(vec![blind_pos], vec![blind_neg]).unwrap();
 
         assert!(secp.verify_commit_sum(
-            vec![commit(5, blind_pos)],
-            vec![commit(3, blind_neg), commit(2, blind_sum)],
+            vec![commit(101, blind_pos)],
+            vec![commit(75, blind_neg), commit(26, blind_sum)],
         ));
     }
 
@@ -583,15 +651,11 @@ mod tests {
 
 	#[test]
 	fn test_range_proof() {
-		// panic!("TODO - this test will SIGSEGV when run");
-		panic!("TODO - no more SIGSEGV now we are passing in msg and extra_commit - but it hangs, no gen?");
 		let secp = Secp256k1::with_caps(ContextFlag::Commit);
 		let blinding = SecretKey::new(&secp, &mut OsRng::new().unwrap());
 		let commit = secp.commit(7, blinding).unwrap();
 		let nonce = secp.nonce();
 		let range_proof = secp.range_proof(0, 7, blinding, commit, nonce);
-		panic!("did we SIGSEGV yet? - yes we did, so range_proof is causing it");
-
 		let proof_range = secp.verify_range_proof(commit, range_proof).unwrap();
 
 		assert_eq!(proof_range.min, 0);
