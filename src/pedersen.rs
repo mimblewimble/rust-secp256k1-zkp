@@ -627,7 +627,6 @@ mod tests {
 
 	#[test]
 	fn test_commit_sum() {
-		panic!("this test will fail hard - missing function in underlying c code");
 		let secp = Secp256k1::with_caps(ContextFlag::Commit);
 
 		fn commit(value: u64, blinding: SecretKey) -> Commitment {
