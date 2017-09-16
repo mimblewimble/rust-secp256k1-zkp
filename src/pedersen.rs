@@ -53,7 +53,7 @@ impl Commitment {
 		mem::uninitialized()
 	}
 
-	/// Converts a commitment into two "candidate" public keys (don't laugh)
+	/// Converts a commitment into two "candidate" public keys
 	/// one of these will be valid, the other has the incorrect parity
 	/// we just don't know which is which...
 	/// once secp provides the necessary api we will no longer need this hack
