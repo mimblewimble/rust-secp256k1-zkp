@@ -28,6 +28,7 @@ use constants;
 use ffi;
 use key;
 use key::SecretKey;
+use super::{Message, Signature};
 use rand::{Rng, OsRng};
 use serde::{ser, de};
 
@@ -35,7 +36,6 @@ use serde::{ser, de};
 pub struct Commitment(pub [u8; constants::PEDERSEN_COMMITMENT_SIZE]);
 impl_array_newtype!(Commitment, u8, constants::PEDERSEN_COMMITMENT_SIZE);
 impl_pretty_debug!(Commitment);
-
 
 impl Commitment {
     /// Builds a Hash from a byte vector. If the vector is too short, it will be
@@ -58,7 +58,7 @@ impl Commitment {
 	/// we just don't know which is which...
 	/// once secp provides the necessary api we will no longer need this hack
 	/// grin uses the public key to verify signatures (hopefully one of these keys works)
-	pub fn to_two_pubkeys(&self, secp: &Secp256k1) -> [key::PublicKey; 2] {
+	fn to_two_pubkeys(&self, secp: &Secp256k1) -> [key::PublicKey; 2] {
 		let mut pk1 = [0; constants::COMPRESSED_PUBLIC_KEY_SIZE];
 		for i in 0..self.0.len() {
 			if i == 0 {
@@ -84,41 +84,10 @@ impl Commitment {
 
 	/// Converts a commitment to a public key
 	/// TODO - we need an API in secp to convert commitments to public keys safely
-	/// right now a commitment is prefixed 08/09 and public keys are prefixed 02/03
+	/// a commitment is prefixed 08/09 and public keys are prefixed 02/03
 	/// see to_two_pubkeys() for a short term workaround
 	pub fn to_pubkey(&self, secp: &Secp256k1) -> Result<key::PublicKey, Error> {
-		let mut pk = [0; constants::COMPRESSED_PUBLIC_KEY_SIZE];
-		for i in 0..self.0.len() {
-			if i == 0 {
-				// if self.0[i] == 0x08 {
-					pk[i] = 0x02;
-				// } else {
-					// pk[i] = 0x03;
-				// 	}
-			} else {
-				pk[i] = self.0[i];
-			}
-		}
-		let public_key = key::PublicKey::from_slice(secp, &pk);
-
-		let mut pk2 = [0; constants::COMPRESSED_PUBLIC_KEY_SIZE];
-		for i in 0..self.0.len() {
-			if i == 0 {
-				// if self.0[i] == 0x08 {
-					// pk2[i] = 0x02;
-				// } else {
-					pk2[i] = 0x03;
-				// 	}
-			} else {
-				pk2[i] = self.0[i];
-			}
-		}
-		let public_key2 = key::PublicKey::from_slice(secp, &pk2);
-
-		println!("pk1 - {:?}", public_key);
-		println!("pk2 - {:?}", public_key2);
-
-		public_key
+		key::PublicKey::from_slice(secp, &self.0)
 	}
 }
 
@@ -266,6 +235,23 @@ impl ::std::fmt::Debug for RangeProof {
 }
 
 impl Secp256k1 {
+	/// TODO should does this live here?
+	/// TODO how to handle dependencies between pedersen and lib?
+	pub fn verify_from_commit(&self, msg: &Message, sig: &Signature, commit: &Commitment) -> Result<(), Error> {
+		if self.caps != ContextFlag::Commit {
+			return Err(Error::IncapableContext);
+		}
+
+		let pubkeys = commit.to_two_pubkeys(&self);
+
+		let result = self.verify(msg, sig, &pubkeys[0]);
+		match result {
+			Ok(x) => Ok(x),
+			Err(_) => {
+				self.verify(msg, sig, &pubkeys[1])
+			}
+		}
+	}
 
 	/// Creates a switch commitment from a blinding factor
 	pub fn switch_commit(&self,  blind: SecretKey) -> Result<Commitment, Error> {
@@ -597,12 +583,13 @@ impl Secp256k1 {
 
 #[cfg(test)]
 mod tests {
-    use super::Secp256k1;
-    use super::Commitment;
+    use super::{Commitment, Message, Secp256k1};
     use ContextFlag;
     use key::{ONE_KEY, ZERO_KEY, SecretKey};
 
     use rand::os::OsRng;
+	use rand::{Rng, thread_rng};
+
 
     #[test]
     fn test_verify_commit_sum_zero_keys() {
@@ -707,6 +694,30 @@ mod tests {
 		match pubkey {
 			Ok(_) => panic!("expected this to return an error"),
 			Err(_) => {}
+		}
+	}
+
+	#[test]
+	fn test_sign_with_pubkey_from_commitment() {
+		let secp = Secp256k1::with_caps(ContextFlag::Commit);
+		let blinding = SecretKey::new(&secp, &mut OsRng::new().unwrap());
+		let commit = secp.commit(0u64, blinding).unwrap();
+
+		let mut msg = [0u8; 32];
+		thread_rng().fill_bytes(&mut msg);
+		let msg = Message::from_slice(&msg).unwrap();
+
+		let sig = secp.sign(&msg, &blinding).unwrap();
+
+		let pubkeys = commit.to_two_pubkeys(&secp);
+
+		// check that we can successfully verify the signature with one of the public keys
+		if let Ok(_) = secp.verify(&msg, &sig, &pubkeys[0]) {
+			// this is good
+		} else if let Ok(_) = secp.verify(&msg, &sig, &pubkeys[1]) {
+			// this is also good
+		} else {
+			panic!("this is not good");
 		}
 	}
 

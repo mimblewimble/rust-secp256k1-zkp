@@ -643,13 +643,10 @@ impl Secp256k1 {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use rand::{Rng, thread_rng};
     use serialize::hex::FromHex;
-	use rand::os::OsRng;
-
     use key::{SecretKey, PublicKey};
     use super::constants;
     use super::{Secp256k1, Signature, RecoverableSignature, Message, RecoveryId, ContextFlag};
@@ -713,30 +710,6 @@ mod tests {
         assert_eq!(sk, new_sk);
         assert_eq!(pk, new_pk);
     }
-
-	#[test]
-	fn test_sign_with_pubkey_from_commitment() {
-		let secp = Secp256k1::with_caps(ContextFlag::Commit);
-		let blinding = SecretKey::new(&secp, &mut OsRng::new().unwrap());
-		let commit = secp.commit(0u64, blinding).unwrap();
-
-		let mut msg = [0u8; 32];
-		thread_rng().fill_bytes(&mut msg);
-		let msg = Message::from_slice(&msg).unwrap();
-
-		let sig = secp.sign(&msg, &blinding).unwrap();
-
-		let pubkeys = commit.to_two_pubkeys(&secp);
-
-		// check that we can successfully verify the signature with one of the public keys
-		if let Ok(_) = secp.verify(&msg, &sig, &pubkeys[0]) {
-			// this is good
-		} else if let Ok(_) = secp.verify(&msg, &sig, &pubkeys[1]) {
-			// this is also good
-		} else {
-			panic!("this is not good");
-		}
-	}
 
     #[test]
     fn recid_sanity_check() {
