@@ -163,7 +163,6 @@ impl PublicKey {
     #[inline]
     pub fn from_slice(secp: &Secp256k1, data: &[u8])
                       -> Result<PublicKey, Error> {
-
         let mut pk = unsafe { ffi::PublicKey::blank() };
         unsafe {
             if ffi::secp256k1_ec_pubkey_parse(secp.ctx, &mut pk, data.as_ptr(),
@@ -708,5 +707,3 @@ mod test {
         assert_eq!(count, COUNT);
     }
 }
-
-

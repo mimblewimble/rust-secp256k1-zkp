@@ -35,11 +35,18 @@ pub const COMPRESSED_PUBLIC_KEY_SIZE: usize = 33;
 /// The maximum size of a signature
 pub const MAX_SIGNATURE_SIZE: usize = 72;
 
-/// The size of a Schnorr signature
-pub const SCHNORR_SIGNATURE_SIZE: usize = 64;
-
 /// The maximum size of a compact signature
 pub const COMPACT_SIGNATURE_SIZE: usize = 64;
+
+/// The size of a Pedersen commitment
+pub const PEDERSEN_COMMITMENT_SIZE: usize = 33;
+
+/// The max size of a range proof
+pub const MAX_PROOF_SIZE: usize = 5134;
+
+/// The maximum size of a message embedded in a range proof
+// pub const PROOF_MSG_SIZE: usize = 4096;
+pub const PROOF_MSG_SIZE: usize = 2048;
 
 /// The order of the secp256k1 curve
 pub const CURVE_ORDER: [u8; 32] = [
@@ -64,5 +71,3 @@ pub const GENERATOR_Y: [u8; 32] = [
     0xfd, 0x17, 0xb4, 0x48, 0xa6, 0x85, 0x54, 0x19,
     0x9c, 0x47, 0xd0, 0x8f, 0xfb, 0x10, 0xd4, 0xb8
 ];
-
-

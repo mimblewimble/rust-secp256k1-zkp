@@ -1,6 +1,6 @@
 [package]
 
-name = "secp256k1"
+name = "secp256k1zkp"
 version = "0.7.1"
 authors = [ "Dawid Ciężarkiewicz <dpc@ucore.info>",
             "Andrew Poelstra <apoelstra@wpsoftware.net>" ]
@@ -17,7 +17,7 @@ build = "build.rs"
 gcc = "0.3"
 
 [lib]
-name = "secp256k1"
+name = "secp256k1zkp"
 path = "src/lib.rs"
 
 [features]
@@ -33,4 +33,3 @@ libc = "0.2"
 rustc-serialize = "0.3"
 serde = "1.0"
 serde_json = "1.0"
-

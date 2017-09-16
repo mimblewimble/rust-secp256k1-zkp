@@ -42,6 +42,12 @@ macro_rules! impl_array_newtype {
             pub fn is_empty(&self) -> bool { false }
         }
 
+        impl AsRef<[u8]> for $thing {
+            fn as_ref(&self) -> &[u8] {
+                self.0.as_ref()
+            }
+        }
+
         impl PartialEq for $thing {
             #[inline]
             fn eq(&self, other: &$thing) -> bool {
@@ -114,6 +120,15 @@ macro_rules! impl_array_newtype {
                 let &$thing(ref dat) = self;
                 &dat[..]
             }
+        }
+
+        impl ::std::hash::Hash for $thing {
+          fn hash<H: ::std::hash::Hasher>(&self, state: &mut H) {
+            state.write(&self.0)
+            // for n in 0..self.len() {
+            //   state.write_u8(self.0[n]);
+            // }
+          }
         }
 
         impl ::serialize::Decodable for $thing {
@@ -223,6 +238,14 @@ macro_rules! impl_raw_debug {
             }
         }
      }
+}
+
+macro_rules! map_vec {
+  ($thing:expr, $mapfn:expr ) => {
+    $thing.iter()
+      .map($mapfn)
+      .collect::<Vec<_>>();
+  }
 }
 
 #[cfg(test)]

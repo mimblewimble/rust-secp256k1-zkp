@@ -24,7 +24,7 @@
 extern crate gcc;
 
 fn main() {
-    let mut base_config = gcc::Config::new();
+    let mut base_config = gcc::Build::new();
     base_config.include("depend/secp256k1-zkp/")
                .include("depend/secp256k1-zkp/include")
                .include("depend/secp256k1-zkp/src")
@@ -39,12 +39,12 @@ fn main() {
                .define("USE_ENDOMORPHISM", Some("1"))
                // These all are OK.
                .define("ENABLE_MODULE_ECDH", Some("1"))
-               .define("ENABLE_MODULE_SCHNORR", Some("1"))
-               .define("ENABLE_MODULE_RECOVERY", Some("1"));
+               .define("ENABLE_MODULE_GENERATOR", Some("1"))
+               .define("ENABLE_MODULE_RECOVERY", Some("1"))
+               .define("ENABLE_MODULE_RANGEPROOF", Some("1"));
 
     // secp256k1-zkp
     base_config.file("depend/secp256k1-zkp/contrib/lax_der_parsing.c")
                .file("depend/secp256k1-zkp/src/secp256k1.c")
                .compile("libsecp256k1.a");
 }
-

@@ -17,9 +17,8 @@
 //! Direct bindings to the underlying C library functions. These should
 //! not be needed for most users.
 use std::mem;
-use std::hash;
 
-use libc::{c_int, c_uchar, c_uint, c_void, size_t};
+use libc::{c_int, c_uchar, c_uint, c_void, size_t, uint64_t};
 
 /// Flag for context to enable no precomputation
 pub const SECP256K1_START_NONE: c_uint = (1 << 0) | 0;
@@ -65,12 +64,6 @@ impl PublicKey {
     pub fn new() -> PublicKey { PublicKey([0; 64]) }
     /// Create a new (uninitialized) public key usable for the FFI interface
     pub unsafe fn blank() -> PublicKey { mem::uninitialized() }
-}
-
-impl hash::Hash for PublicKey {
-    fn hash<H: hash::Hasher>(&self, state: &mut H) {
-        state.write(&self.0)
-    }
 }
 
 /// Library-internal representation of a Secp256k1 signature
@@ -141,8 +134,8 @@ extern "C" {
                                      -> c_int;
 
     pub fn secp256k1_ec_pubkey_serialize(cx: *const Context, output: *const c_uchar,
-                                         out_len: *mut size_t, pk: *const PublicKey
-,                                        compressed: c_uint)
+                                         out_len: *mut size_t, pk: *const PublicKey,
+                                         compressed: c_uint)
                                          -> c_int;
 
     // Signatures
@@ -175,7 +168,7 @@ extern "C" {
                                                                    -> c_int;
 
     pub fn secp256k1_ecdsa_recoverable_signature_convert(cx: *const Context, sig: *mut Signature,
-                                                         input: *const RecoverableSignature) 
+                                                         input: *const RecoverableSignature)
                                                          -> c_int;
 
     pub fn secp256k1_ecdsa_signature_normalize(cx: *const Context, out_sig: *mut Signature,
@@ -210,27 +203,6 @@ extern "C" {
                                    sig: *const RecoverableSignature,
                                    msg32: *const c_uchar)
                                    -> c_int;
-
-    // Schnorr
-    pub fn secp256k1_schnorr_sign(cx: *const Context,
-                                  sig64: *mut c_uchar,
-                                  msg32: *const c_uchar,
-                                  sk: *const c_uchar,
-                                  noncefn: NonceFn,
-                                  noncedata: *const c_void)
-                                  -> c_int;
-
-    pub fn secp256k1_schnorr_verify(cx: *const Context,
-                                    sig64: *const c_uchar,
-                                    msg32: *const c_uchar,
-                                    pk: *const PublicKey)
-                                    -> c_int;
-
-    pub fn secp256k1_schnorr_recover(cx: *const Context,
-                                     pk: *mut PublicKey,
-                                     sig64: *const c_uchar,
-                                     msg32: *const c_uchar)
-                                     -> c_int;
 
     // EC
     pub fn secp256k1_ec_seckey_verify(cx: *const Context,
@@ -273,5 +245,112 @@ extern "C" {
                           point: *const PublicKey,
                           scalar: *const c_uchar)
                           -> c_int;
-}
 
+    // Generates a switch commitment: *commit = blind * J
+    // The commitment is 33 bytes, the blinding factor is 32 bytes.
+    pub fn secp256k1_switch_commit(ctx: *const Context,
+                                   commit: *mut c_uchar,
+                                   blind: *const c_uchar)
+                                   -> c_int;
+
+	// Generates a pedersen commitment: *commit = blind * G + value * G2.
+	// The commitment is 33 bytes, the blinding factor is 32 bytes.
+	pub fn secp256k1_pedersen_commit(
+		ctx: *const Context,
+		commit: *mut c_uchar,
+		blind: *const c_uchar,
+		value: uint64_t,
+		gen: *const c_uchar
+	) -> c_int;
+
+	// Takes a list of n pointers to 32 byte blinding values, the first negs
+	// of which are treated with positive sign and the rest negative, then
+	// calculates an additional blinding value that adds to zero.
+	pub fn secp256k1_pedersen_blind_sum(
+		ctx: *const Context,
+		blind_out: *const c_uchar,
+		blinds: *const *const c_uchar,
+		n: size_t,
+		npositive: size_t
+	) -> c_int;
+
+	// Takes two list of 33-byte commitments and sums the first set, subtracts
+	// the second and returns the resulting commitment.
+	pub fn secp256k1_pedersen_commit_sum(
+		ctx: *const Context,
+		commit_out: *const c_uchar,
+		commits: *const *const c_uchar,
+		pcnt: size_t,
+		ncommits: *const *const c_uchar,
+		ncnt: size_t
+	) -> c_int;
+
+	// Takes two list of 33-byte commitments and sums the first set and
+	// subtracts the second and verifies that they sum to 0.
+	pub fn secp256k1_pedersen_verify_tally(ctx: *const Context,
+		commits: *const *const c_uchar,
+		pcnt: size_t,
+		ncommits: *const *const c_uchar,
+		ncnt: size_t
+	) -> c_int;
+
+	pub fn secp256k1_rangeproof_info(
+		ctx: *const Context,
+		exp: *mut c_int,
+		mantissa: *mut c_int,
+		min_value: *mut uint64_t,
+		max_value: *mut uint64_t,
+		proof: *const c_uchar,
+		plen: size_t,
+		extra_commit: *const c_uchar,
+		extra_commit_len: size_t,
+		gen: *const c_uchar
+	) -> c_int;
+
+	pub fn secp256k1_rangeproof_rewind(
+		ctx: *const Context,
+		blind_out: *mut c_uchar,
+		value_out: *mut uint64_t,
+		message_out: *mut c_uchar,
+		outlen: *mut size_t,
+		nonce: *const c_uchar,
+		min_value: *mut uint64_t,
+		max_value: *mut uint64_t,
+		commit: *const c_uchar,
+		proof: *const c_uchar,
+		plen: size_t,
+		extra_commit: *const c_uchar,
+		extra_commit_len: size_t,
+		gen: *const c_uchar
+	) -> c_int;
+
+	pub fn secp256k1_rangeproof_verify(
+		ctx: *const Context,
+		min_value: &mut uint64_t,
+		max_value: &mut uint64_t,
+		commit: *const c_uchar,
+		proof: *const c_uchar,
+		plen: size_t,
+		extra_commit: *const c_uchar,
+		extra_commit_len: size_t,
+		gen: *const c_uchar
+	) -> c_int;
+
+	pub fn secp256k1_rangeproof_sign(
+		ctx: *const Context,
+		proof: *mut c_uchar,
+		plen: *mut size_t,
+		min_value: uint64_t,
+		commit: *const c_uchar,
+		blind: *const c_uchar,
+		nonce: *const c_uchar,
+		exp: c_int,
+		min_bits: c_int,
+		value: uint64_t,
+		message: *const c_uchar,
+		msg_len: size_t,
+		extra_commit: *const c_uchar,
+		extra_commit_len: size_t,
+		gen: *const c_uchar
+	) -> c_int;
+}
