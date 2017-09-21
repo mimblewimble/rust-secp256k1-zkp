@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.org/apoelstra/rust-secp256k1.png?branch=master)](https://travis-ci.org/apoelstra/rust-secp256k1)
+[![Build Status](https://travis-ci.org/mimblewimble/rust-secp256k1-zkp.png?branch=master)](https://travis-ci.org/mimblewimble/rust-secp256k1-zkp)
 
 ### rust-secp256k1
 
@@ -12,4 +12,3 @@ a C library by Peter Wuille for producing ECDSA signatures using the SECG curve
 * makes no allocations (except in unit tests) for efficiency and use in freestanding implementations
 
 [Full documentation](https://www.wpsoftware.net/rustdoc/secp256k1/)
-
