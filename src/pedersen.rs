@@ -195,6 +195,56 @@ impl RangeProof {
 	}
 }
 
+
+pub struct ProofMessage(Vec<u8>);
+
+impl ProofMessage {
+	pub fn empty() -> ProofMessage {
+		ProofMessage(vec![])
+	}
+
+	pub fn from_bytes(array: &[u8]) -> ProofMessage {
+		let mut msg = vec![];
+		for &value in array {
+			msg.push(value);
+		}
+		ProofMessage(msg)
+	}
+
+	pub fn as_bytes(&self) -> &[u8] {
+		self.0.iter().as_slice()
+	}
+
+	pub fn as_ptr(&self) -> *const u8 {
+		self.0.as_ptr()
+	}
+
+	pub fn len(&self) -> usize {
+		self.0.len()
+	}
+
+	pub fn truncate(&mut self, len: usize) {
+		self.0.truncate(len)
+	}
+}
+
+impl ::std::cmp::PartialEq for ProofMessage {
+	fn eq(&self, other: &ProofMessage) -> bool {
+		self.0[..] == other.0[..]
+	}
+}
+impl ::std::cmp::Eq for ProofMessage {}
+
+impl ::std::fmt::Debug for ProofMessage {
+	fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+		try!(write!(f, "{}(", stringify!(ProofMessage)));
+		for i in self.0.iter().cloned() {
+			try!(write!(f, "{:02x}", i));
+		}
+		write!(f, ")")
+	}
+}
+
 /// The range that was proven
 #[derive(Debug)]
 pub struct ProofRange {
@@ -211,9 +261,9 @@ pub struct ProofInfo {
 	/// Value that was used by the commitment
 	pub value: u64,
 	/// Message embedded in the proof
-	pub message: [u8; constants::PROOF_MSG_SIZE],
-	/// Length of the embedded message
-	pub mlen: i32,
+	pub message: ProofMessage,
+	/// Length of the embedded message (message is "padded" with garbage to fixed number of bytes)
+	pub mlen: usize,
 	/// Min value that was proven
 	pub min: u64,
 	/// Max value that was proven
@@ -223,6 +273,8 @@ pub struct ProofInfo {
 	/// Mantissa used by the proof
 	pub mantissa: i32,
 }
+
+
 
 impl ::std::fmt::Debug for RangeProof {
 	fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
@@ -410,12 +462,17 @@ impl Secp256k1 {
 		value: u64,
 		blind: SecretKey,
 		commit: Commitment,
-		nonce: [u8; 32]
+		message: ProofMessage,
 	) -> RangeProof {
 		let mut retried = false;
 		let mut proof = [0; constants::MAX_PROOF_SIZE];
 		let mut plen = constants::MAX_PROOF_SIZE as size_t;
-		let message = [0u8; 32];
+
+		// use a "known key" as the nonce, specifically the blinding factor
+		// of the commitment for which we are generating the range proof
+		// so we can later recover the value and the message by unwinding the range proof
+		// with the same nonce
+		let nonce = blind.clone();
 
 		let extra_commit = [0u8; 33];
 		let gen = self.generator_h();
@@ -439,13 +496,13 @@ impl Secp256k1 {
 					64,
 					value,
 					message.as_ptr(),
-					0 as size_t,
+					message.len(),
 					extra_commit.as_ptr(),
 					0 as size_t,
 					gen.as_ptr(),
 				) == 1
 			};
-			// break out of the loop immeidately on success or
+			// break out of the loop immediately on success or
 			// or on the 2nd attempt if we retried
 			if success || retried {
 				break;
@@ -501,12 +558,12 @@ impl Secp256k1 {
 		&self,
 		commit: Commitment,
 		proof: RangeProof,
-		nonce: [u8; 32]
+		nonce: SecretKey,
 	) -> ProofInfo {
 		let mut value: u64 = 0;
 		let mut blind: [u8; 32] = unsafe { mem::uninitialized() };
-		let mut message = [0u8; constants::PROOF_MSG_SIZE];
-		let mut mlen: size_t = 0;
+		let mut message: [u8; constants::PROOF_MSG_SIZE] = unsafe { mem::uninitialized() };
+		let mut mlen: usize = constants::PROOF_MSG_SIZE;
 		let mut min: u64 = 0;
 		let mut max: u64 = 0;
 
@@ -531,11 +588,12 @@ impl Secp256k1 {
 				gen.as_ptr(),
 			) == 1
 		};
+
 		ProofInfo {
 			success: success,
 			value: value,
-			message: message,
-			mlen: mlen as i32,
+			message: ProofMessage::from_bytes(&message),
+			mlen: mlen,
 			min: min,
 			max: max,
 			exp: 0,
@@ -571,7 +629,7 @@ impl Secp256k1 {
 		ProofInfo {
 			success: success,
 			value: 0,
-			message: [0; constants::PROOF_MSG_SIZE],
+			message: ProofMessage::empty(),
 			mlen: 0,
 			min: min,
 			max: max,
