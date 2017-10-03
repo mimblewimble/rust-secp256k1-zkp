@@ -267,6 +267,7 @@ pub struct ProofRange {
 }
 
 /// Information about a valid proof after rewinding it.
+#[derive(Debug)]
 pub struct ProofInfo {
 	/// Whether the proof is valid or not
 	pub success: bool,
