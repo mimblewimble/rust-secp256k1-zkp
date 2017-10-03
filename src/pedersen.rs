@@ -195,14 +195,19 @@ impl RangeProof {
 	}
 }
 
-
+/// A message included in a range proof.
+/// The message is recoverable by rewinding a range proof
+/// passing in the same nonce that was used to originally create the range proof.
+#[derive(Clone)]
 pub struct ProofMessage(Vec<u8>);
 
 impl ProofMessage {
+	/// Creates an empty message.
 	pub fn empty() -> ProofMessage {
 		ProofMessage(vec![])
 	}
 
+	/// Creates a message from a byte slice.
 	pub fn from_bytes(array: &[u8]) -> ProofMessage {
 		let mut msg = vec![];
 		for &value in array {
@@ -211,18 +216,25 @@ impl ProofMessage {
 		ProofMessage(msg)
 	}
 
+	/// Converts the message to a byte slice.
 	pub fn as_bytes(&self) -> &[u8] {
 		self.0.iter().as_slice()
 	}
 
+	/// Converts the message to a raw pointer.
 	pub fn as_ptr(&self) -> *const u8 {
 		self.0.as_ptr()
 	}
 
+	/// The length of the message.
+	/// This will be PROOF_MSG_SIZE unless the message has been truncated.
 	pub fn len(&self) -> usize {
 		self.0.len()
 	}
 
+	/// Message in the range proof is the first len bytes of the fixed PROOF_MSG_SIZE.
+	/// We can truncate it to the correct size if we know how many bytes we care about.
+	/// This probably implies the message will take a known format.
 	pub fn truncate(&mut self, len: usize) {
 		self.0.truncate(len)
 	}
@@ -287,15 +299,23 @@ impl ::std::fmt::Debug for RangeProof {
 }
 
 impl Secp256k1 {
-	/// TODO should does this live here?
-	/// TODO how to handle dependencies between pedersen and lib?
+	/// *** This is a temporary work-around. ***
+	/// We do not know which of the two possible public keys from the commit to use,
+	/// so here we try both of them and succeed if either works.
+	/// This is sub-optimal in terms of performance.
+	/// I believe apoelstra has a strategy for fixing this in the secp256k1-zkp lib.
 	pub fn verify_from_commit(&self, msg: &Message, sig: &Signature, commit: &Commitment) -> Result<(), Error> {
 		if self.caps != ContextFlag::Commit {
 			return Err(Error::IncapableContext);
 		}
 
+		// If we knew which one we cared about here we would just use it,
+		// but for now return both so we can try them both.
 		let pubkeys = commit.to_two_pubkeys(&self);
 
+		// Attempt to verify with the first public key,
+		// if verify fails try the other one.
+		// The first will fail on average 50% of the time.
 		let result = self.verify(msg, sig, &pubkeys[0]);
 		match result {
 			Ok(x) => Ok(x),
@@ -305,7 +325,7 @@ impl Secp256k1 {
 		}
 	}
 
-	/// Creates a switch commitment from a blinding factor
+	/// Creates a switch commitment from a blinding factor.
 	pub fn switch_commit(&self,  blind: SecretKey) -> Result<Commitment, Error> {
 
 		if self.caps != ContextFlag::Commit {
@@ -641,7 +661,7 @@ impl Secp256k1 {
 
 #[cfg(test)]
 mod tests {
-    use super::{Commitment, Message, Secp256k1};
+    use super::{Commitment, ProofMessage, Message, Secp256k1};
     use ContextFlag;
     use key::{ONE_KEY, ZERO_KEY, SecretKey};
 
@@ -814,8 +834,8 @@ mod tests {
 		let secp = Secp256k1::with_caps(ContextFlag::Commit);
 		let blinding = SecretKey::new(&secp, &mut OsRng::new().unwrap());
 		let commit = secp.commit(7, blinding).unwrap();
-		let nonce = secp.nonce();
-		let range_proof = secp.range_proof(0, 7, blinding, commit, nonce);
+		let msg = ProofMessage::empty();
+		let range_proof = secp.range_proof(0, 7, blinding, commit, msg.clone());
 		let proof_range = secp.verify_range_proof(commit, range_proof).unwrap();
 
 		assert_eq!(proof_range.min, 0);
@@ -826,23 +846,22 @@ mod tests {
 		// check we get no information back for the value here
 		assert_eq!(proof_info.value, 0);
 
-		let proof_info = secp.rewind_range_proof(commit, range_proof, nonce);
+		let proof_info = secp.rewind_range_proof(commit, range_proof, blinding);
 		assert!(proof_info.success);
 		assert_eq!(proof_info.min, 0);
 		assert_eq!(proof_info.value, 7);
 
 		// check we cannot rewind a range proof without the original nonce
-		let bad_nonce = secp.nonce();
+		let bad_nonce = SecretKey::new(&secp, &mut OsRng::new().unwrap());
 		let bad_info = secp.rewind_range_proof(commit, range_proof, bad_nonce);
 		assert_eq!(bad_info.success, false);
 		assert_eq!(bad_info.value, 0);
 
 		// check we can construct and verify a range proof on value 0
 		let commit = secp.commit(0, blinding).unwrap();
-		let nonce = secp.nonce();
-		let range_proof = secp.range_proof(0, 0, blinding, commit, nonce);
+		let range_proof = secp.range_proof(0, 0, blinding, commit, msg);
 		secp.verify_range_proof(commit, range_proof).unwrap();
-		let proof_info = secp.rewind_range_proof(commit, range_proof, nonce);
+		let proof_info = secp.rewind_range_proof(commit, range_proof, blinding.clone());
 		assert!(proof_info.success);
 		assert_eq!(proof_info.min, 0);
 		assert_eq!(proof_info.value, 0);
