@@ -18,4 +18,4 @@ script:
       cargo test &&
       cargo test --release &&
       cargo bench &&
-      cargo --only stable doc
+      cargo doc
