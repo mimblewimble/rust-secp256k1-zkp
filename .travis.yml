@@ -14,8 +14,8 @@ matrix:
 script:
   - |
       cargo build &&
-      cargo build -- --release &&
+      cargo build --release &&
       cargo test &&
-      cargo test -- --release &&
+      cargo test --release &&
       cargo bench &&
-      cargo --only stable doc
+      cargo doc

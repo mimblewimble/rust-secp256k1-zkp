@@ -195,6 +195,68 @@ impl RangeProof {
 	}
 }
 
+/// A message included in a range proof.
+/// The message is recoverable by rewinding a range proof
+/// passing in the same nonce that was used to originally create the range proof.
+#[derive(Clone)]
+pub struct ProofMessage(Vec<u8>);
+
+impl ProofMessage {
+	/// Creates an empty message.
+	pub fn empty() -> ProofMessage {
+		ProofMessage(vec![])
+	}
+
+	/// Creates a message from a byte slice.
+	pub fn from_bytes(array: &[u8]) -> ProofMessage {
+		let mut msg = vec![];
+		for &value in array {
+			msg.push(value);
+		}
+		ProofMessage(msg)
+	}
+
+	/// Converts the message to a byte slice.
+	pub fn as_bytes(&self) -> &[u8] {
+		self.0.iter().as_slice()
+	}
+
+	/// Converts the message to a raw pointer.
+	pub fn as_ptr(&self) -> *const u8 {
+		self.0.as_ptr()
+	}
+
+	/// The length of the message.
+	/// This will be PROOF_MSG_SIZE unless the message has been truncated.
+	pub fn len(&self) -> usize {
+		self.0.len()
+	}
+
+	/// Message in the range proof is the first len bytes of the fixed PROOF_MSG_SIZE.
+	/// We can truncate it to the correct size if we know how many bytes we care about.
+	/// This probably implies the message will take a known format.
+	pub fn truncate(&mut self, len: usize) {
+		self.0.truncate(len)
+	}
+}
+
+impl ::std::cmp::PartialEq for ProofMessage {
+	fn eq(&self, other: &ProofMessage) -> bool {
+		self.0[..] == other.0[..]
+	}
+}
+impl ::std::cmp::Eq for ProofMessage {}
+
+impl ::std::fmt::Debug for ProofMessage {
+	fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+		try!(write!(f, "{}(", stringify!(ProofMessage)));
+		for i in self.0.iter().cloned() {
+			try!(write!(f, "{:02x}", i));
+		}
+		write!(f, ")")
+	}
+}
+
 /// The range that was proven
 #[derive(Debug)]
 pub struct ProofRange {
@@ -205,15 +267,16 @@ pub struct ProofRange {
 }
 
 /// Information about a valid proof after rewinding it.
+#[derive(Debug)]
 pub struct ProofInfo {
 	/// Whether the proof is valid or not
 	pub success: bool,
 	/// Value that was used by the commitment
 	pub value: u64,
 	/// Message embedded in the proof
-	pub message: [u8; constants::PROOF_MSG_SIZE],
-	/// Length of the embedded message
-	pub mlen: i32,
+	pub message: ProofMessage,
+	/// Length of the embedded message (message is "padded" with garbage to fixed number of bytes)
+	pub mlen: usize,
 	/// Min value that was proven
 	pub min: u64,
 	/// Max value that was proven
@@ -223,6 +286,8 @@ pub struct ProofInfo {
 	/// Mantissa used by the proof
 	pub mantissa: i32,
 }
+
+
 
 impl ::std::fmt::Debug for RangeProof {
 	fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
@@ -235,15 +300,23 @@ impl ::std::fmt::Debug for RangeProof {
 }
 
 impl Secp256k1 {
-	/// TODO should does this live here?
-	/// TODO how to handle dependencies between pedersen and lib?
+	/// *** This is a temporary work-around. ***
+	/// We do not know which of the two possible public keys from the commit to use,
+	/// so here we try both of them and succeed if either works.
+	/// This is sub-optimal in terms of performance.
+	/// I believe apoelstra has a strategy for fixing this in the secp256k1-zkp lib.
 	pub fn verify_from_commit(&self, msg: &Message, sig: &Signature, commit: &Commitment) -> Result<(), Error> {
 		if self.caps != ContextFlag::Commit {
 			return Err(Error::IncapableContext);
 		}
 
+		// If we knew which one we cared about here we would just use it,
+		// but for now return both so we can try them both.
 		let pubkeys = commit.to_two_pubkeys(&self);
 
+		// Attempt to verify with the first public key,
+		// if verify fails try the other one.
+		// The first will fail on average 50% of the time.
 		let result = self.verify(msg, sig, &pubkeys[0]);
 		match result {
 			Ok(x) => Ok(x),
@@ -253,7 +326,7 @@ impl Secp256k1 {
 		}
 	}
 
-	/// Creates a switch commitment from a blinding factor
+	/// Creates a switch commitment from a blinding factor.
 	pub fn switch_commit(&self,  blind: SecretKey) -> Result<Commitment, Error> {
 
 		if self.caps != ContextFlag::Commit {
@@ -410,12 +483,17 @@ impl Secp256k1 {
 		value: u64,
 		blind: SecretKey,
 		commit: Commitment,
-		nonce: [u8; 32]
+		message: ProofMessage,
 	) -> RangeProof {
 		let mut retried = false;
 		let mut proof = [0; constants::MAX_PROOF_SIZE];
 		let mut plen = constants::MAX_PROOF_SIZE as size_t;
-		let message = [0u8; 32];
+
+		// use a "known key" as the nonce, specifically the blinding factor
+		// of the commitment for which we are generating the range proof
+		// so we can later recover the value and the message by unwinding the range proof
+		// with the same nonce
+		let nonce = blind.clone();
 
 		let extra_commit = [0u8; 33];
 		let gen = self.generator_h();
@@ -439,13 +517,13 @@ impl Secp256k1 {
 					64,
 					value,
 					message.as_ptr(),
-					0 as size_t,
+					message.len(),
 					extra_commit.as_ptr(),
 					0 as size_t,
 					gen.as_ptr(),
 				) == 1
 			};
-			// break out of the loop immeidately on success or
+			// break out of the loop immediately on success or
 			// or on the 2nd attempt if we retried
 			if success || retried {
 				break;
@@ -501,12 +579,12 @@ impl Secp256k1 {
 		&self,
 		commit: Commitment,
 		proof: RangeProof,
-		nonce: [u8; 32]
+		nonce: SecretKey,
 	) -> ProofInfo {
 		let mut value: u64 = 0;
 		let mut blind: [u8; 32] = unsafe { mem::uninitialized() };
-		let mut message = [0u8; constants::PROOF_MSG_SIZE];
-		let mut mlen: size_t = 0;
+		let mut message: [u8; constants::PROOF_MSG_SIZE] = unsafe { mem::uninitialized() };
+		let mut mlen: usize = constants::PROOF_MSG_SIZE;
 		let mut min: u64 = 0;
 		let mut max: u64 = 0;
 
@@ -531,11 +609,12 @@ impl Secp256k1 {
 				gen.as_ptr(),
 			) == 1
 		};
+
 		ProofInfo {
 			success: success,
 			value: value,
-			message: message,
-			mlen: mlen as i32,
+			message: ProofMessage::from_bytes(&message),
+			mlen: mlen,
 			min: min,
 			max: max,
 			exp: 0,
@@ -571,7 +650,7 @@ impl Secp256k1 {
 		ProofInfo {
 			success: success,
 			value: 0,
-			message: [0; constants::PROOF_MSG_SIZE],
+			message: ProofMessage::empty(),
 			mlen: 0,
 			min: min,
 			max: max,
@@ -583,7 +662,7 @@ impl Secp256k1 {
 
 #[cfg(test)]
 mod tests {
-    use super::{Commitment, Message, Secp256k1};
+    use super::{Commitment, ProofMessage, Message, Secp256k1};
     use ContextFlag;
     use key::{ONE_KEY, ZERO_KEY, SecretKey};
 
@@ -756,8 +835,8 @@ mod tests {
 		let secp = Secp256k1::with_caps(ContextFlag::Commit);
 		let blinding = SecretKey::new(&secp, &mut OsRng::new().unwrap());
 		let commit = secp.commit(7, blinding).unwrap();
-		let nonce = secp.nonce();
-		let range_proof = secp.range_proof(0, 7, blinding, commit, nonce);
+		let msg = ProofMessage::empty();
+		let range_proof = secp.range_proof(0, 7, blinding, commit, msg.clone());
 		let proof_range = secp.verify_range_proof(commit, range_proof).unwrap();
 
 		assert_eq!(proof_range.min, 0);
@@ -768,23 +847,22 @@ mod tests {
 		// check we get no information back for the value here
 		assert_eq!(proof_info.value, 0);
 
-		let proof_info = secp.rewind_range_proof(commit, range_proof, nonce);
+		let proof_info = secp.rewind_range_proof(commit, range_proof, blinding);
 		assert!(proof_info.success);
 		assert_eq!(proof_info.min, 0);
 		assert_eq!(proof_info.value, 7);
 
 		// check we cannot rewind a range proof without the original nonce
-		let bad_nonce = secp.nonce();
+		let bad_nonce = SecretKey::new(&secp, &mut OsRng::new().unwrap());
 		let bad_info = secp.rewind_range_proof(commit, range_proof, bad_nonce);
 		assert_eq!(bad_info.success, false);
 		assert_eq!(bad_info.value, 0);
 
 		// check we can construct and verify a range proof on value 0
 		let commit = secp.commit(0, blinding).unwrap();
-		let nonce = secp.nonce();
-		let range_proof = secp.range_proof(0, 0, blinding, commit, nonce);
+		let range_proof = secp.range_proof(0, 0, blinding, commit, msg);
 		secp.verify_range_proof(commit, range_proof).unwrap();
-		let proof_info = secp.rewind_range_proof(commit, range_proof, nonce);
+		let proof_info = secp.rewind_range_proof(commit, range_proof, blinding.clone());
 		assert!(proof_info.success);
 		assert_eq!(proof_info.min, 0);
 		assert_eq!(proof_info.value, 0);
