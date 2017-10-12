@@ -334,7 +334,7 @@ impl Secp256k1 {
 		}
 		let mut commit = [0; 33];
 		unsafe {
-			ffi::secp256k1_switch_commit(self.ctx, commit.as_mut_ptr(), blind.as_ptr())
+			ffi::secp256k1_switch_commit(self.ctx, commit.as_mut_ptr(), blind.as_ptr(), constants::GENERATOR_J.as_ptr());
 		};
 		Ok(Commitment(commit))
 	}
@@ -347,16 +347,13 @@ impl Secp256k1 {
 		}
 		let mut commit = [0; 33];
 
-		// TODO - what do we need to be passing in here as the generator?
-		let gen = self.generator_h();
-
 		unsafe {
 			ffi::secp256k1_pedersen_commit(
 				self.ctx,
 				commit.as_mut_ptr(),
 				blind.as_ptr(),
 				value,
-				gen.as_ptr(),
+				constants::GENERATOR_H.as_ptr(),
 			)};
 		Ok(Commitment(commit))
 	}
@@ -371,16 +368,13 @@ impl Secp256k1 {
 		let mut commit = [0; 33];
 		let zblind = [0; 32];
 
-		// TODO - what do we need to be passing in here as the generator?
-		let gen = self.generator_h();
-
 		unsafe {
 			ffi::secp256k1_pedersen_commit(
 				self.ctx,
 				commit.as_mut_ptr(),
 				zblind.as_ptr(),
 				value,
-				gen.as_ptr(),
+				constants::GENERATOR_H.as_ptr(),
 			)};
 		Ok(Commitment(commit))
 	}
@@ -464,16 +458,6 @@ impl Secp256k1 {
 	    nonce
 	}
 
-	// I have no idea what I'm doing but cribbing this from secp256k1-zkp seems to have
-	// cleaned up some of the test failures...
-	fn generator_h(&self) -> [u8; 33] {
-		[
-			0x11,
-			0x50, 0x92, 0x9b, 0x74, 0xc1, 0xa0, 0x49, 0x54, 0xb7, 0x8b, 0x4b, 0x60, 0x35, 0xe9, 0x7a, 0x5e,
-			0x07, 0x8a, 0x5a, 0x0f, 0x28, 0xec, 0x96, 0xd5, 0x47, 0xbf, 0xee, 0x9a, 0xce, 0x80, 0x3a, 0xc0
-		]
-	}
-
 	/// Produces a range proof for the provided value, using min and max
 	/// bounds, relying
 	/// on the blinding factor and commitment.
@@ -496,7 +480,6 @@ impl Secp256k1 {
 		let nonce = blind.clone();
 
 		let extra_commit = [0u8; 33];
-		let gen = self.generator_h();
 
 		// TODO - confirm this reworked retry logic works as expected
 		// pretty sure the original approach retried on success (so twice in total)
@@ -520,7 +503,7 @@ impl Secp256k1 {
 					message.len(),
 					extra_commit.as_ptr(),
 					0 as size_t,
-					gen.as_ptr(),
+					constants::GENERATOR_H.as_ptr(),
 				) == 1
 			};
 			// break out of the loop immediately on success or
@@ -547,7 +530,6 @@ impl Secp256k1 {
 		let mut max: u64 = 0;
 
 		let extra_commit = [0u8; 33];
-		let gen = self.generator_h();
 
 		let success = unsafe {
 			ffi::secp256k1_rangeproof_verify(
@@ -559,7 +541,7 @@ impl Secp256k1 {
 				proof.plen as size_t,
 				extra_commit.as_ptr(),
 				0 as size_t,
-				gen.as_ptr(),
+				constants::GENERATOR_H.as_ptr(),
 			 ) == 1
 		};
 
@@ -589,7 +571,6 @@ impl Secp256k1 {
 		let mut max: u64 = 0;
 
 		let extra_commit = [0u8; 33];
-		let gen = self.generator_h();
 
 		let success = unsafe {
 			ffi::secp256k1_rangeproof_rewind(
@@ -606,7 +587,7 @@ impl Secp256k1 {
 				proof.plen as size_t,
 				extra_commit.as_ptr(),
 				0 as size_t,
-				gen.as_ptr(),
+				constants::GENERATOR_H.as_ptr(),
 			) == 1
 		};
 
@@ -631,7 +612,6 @@ impl Secp256k1 {
 		let mut max: u64 = 0;
 
 		let extra_commit = [0u8; 33];
-		let gen = self.generator_h();
 
 		let success = unsafe {
 			ffi::secp256k1_rangeproof_info(
@@ -644,7 +624,7 @@ impl Secp256k1 {
 				proof.plen as size_t,
 				extra_commit.as_ptr(),
 				0 as size_t,
-				gen.as_ptr(),
+				constants::GENERATOR_H.as_ptr(),
 			) == 1
 		};
 		ProofInfo {
