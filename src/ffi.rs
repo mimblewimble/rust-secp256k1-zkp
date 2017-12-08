@@ -83,6 +83,12 @@ pub struct RecoverableSignature([c_uchar; 65]);
 impl_array_newtype!(RecoverableSignature, c_uchar, 65);
 impl_raw_debug!(RecoverableSignature);
 
+/// Library-internal representation of a Secp256k1 aggsig partial signature
+#[repr(C)]
+pub struct AggSigPartialSignature([c_uchar; 32]);
+impl_array_newtype!(AggSigPartialSignature, c_uchar, 32);
+impl_raw_debug!(AggSigPartialSignature);
+
 impl Signature {
     /// Create a new (zeroed) signature usable for the FFI interface
     pub fn new() -> Signature { Signature([0; 64]) }
@@ -95,6 +101,13 @@ impl RecoverableSignature {
     pub fn new() -> RecoverableSignature { RecoverableSignature([0; 65]) }
     /// Create a new (uninitialized) signature usable for the FFI interface
     pub unsafe fn blank() -> RecoverableSignature { mem::uninitialized() }
+}
+
+impl AggSigPartialSignature {
+    /// Create a new (zeroed) aggsig partial signature usable for the FFI interface
+    pub fn new() -> AggSigPartialSignature { AggSigPartialSignature([0; 32]) }
+    /// Create a new (uninitialized) signature usable for the FFI interface
+    pub unsafe fn blank() -> AggSigPartialSignature { mem::uninitialized() }
 }
 
 /// Library-internal representation of an ECDH shared secret
@@ -216,6 +229,19 @@ extern "C" {
                                            -> *mut AggSigContext;
 
     pub fn secp256k1_aggsig_context_destroy(aggctx: *mut AggSigContext);
+
+    pub fn secp256k1_aggsig_generate_nonce(cx: *const Context,
+                                           aggctx: *mut AggSigContext,
+                                           index: size_t)
+                                           -> c_int;
+
+    pub fn secp256k1_aggsig_partial_sign(cx: *const Context,
+                                         aggctx: *mut AggSigContext,
+                                         sig: *mut AggSigPartialSignature,
+                                         msghash32: *const c_uchar,
+                                         seckey32: *const c_uchar,
+                                         index: size_t)
+                                           -> c_int;
 
     // EC
     pub fn secp256k1_ec_seckey_verify(cx: *const Context,

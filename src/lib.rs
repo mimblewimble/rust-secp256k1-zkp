@@ -74,6 +74,16 @@ impl std::convert::AsRef<[u8]> for Signature {
     }
 }
 
+/// An AggSig partial signature
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+pub struct AggSigPartialSignature(ffi::AggSigPartialSignature);
+
+impl std::convert::AsRef<[u8]> for AggSigPartialSignature {
+    fn as_ref(&self) -> &[u8] {
+        &self.0.as_ref()
+    }
+}
+
 /// An ECDSA signature with a recovery ID for pubkey recovery
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub struct RecoverableSignature(ffi::RecoverableSignature);
@@ -277,6 +287,28 @@ impl From<ffi::Signature> for Signature {
     }
 }
 
+impl AggSigPartialSignature {
+    /// Obtains a raw pointer suitable for use with FFI functions
+    #[inline]
+    pub fn as_ptr(&self) -> *const ffi::AggSigPartialSignature {
+        &self.0 as *const _
+    }
+
+    /// Obtains a raw mutable pointer suitable for use with FFI functions
+    #[inline]
+    pub fn as_mut_ptr(&mut self) -> *mut ffi::AggSigPartialSignature {
+        &mut self.0 as *mut _
+    }
+}
+
+/// Creates a new signature from a FFI signature
+impl From<ffi::AggSigPartialSignature> for AggSigPartialSignature {
+    #[inline]
+    fn from(sig: ffi::AggSigPartialSignature) -> AggSigPartialSignature {
+        AggSigPartialSignature(sig)
+    }
+}
+
 
 impl RecoverableSignature {
     #[inline]
@@ -424,6 +456,8 @@ pub enum Error {
     IncorrectCommitSum,
     /// Range proof is invalid
     InvalidRangeProof,
+    /// Error creating partial signature
+    PartialSigFailure,
 }
 
 // Passthrough Debug to Display, since errors should be user-visible
@@ -447,6 +481,7 @@ impl error::Error for Error {
             Error::InvalidRecoveryId => "secp: bad recovery id",
             Error::IncorrectCommitSum => "secp: invalid pedersen commitment sum",
             Error::InvalidRangeProof => "secp: invalid range proof",
+            Error::PartialSigFailure => "secp: partial sig (aggsig) failure",
         }
     }
 }
