@@ -53,6 +53,11 @@ pub type NonceFn = unsafe extern "C" fn(nonce32: *mut c_uchar,
 #[derive(Clone, Debug)]
 #[repr(C)] pub struct Context(c_int);
 
+/// Secp256k1 aggsig context. As above, needs to be destroyed with
+/// `secp256k1_aggsig_context_destroy`
+#[derive(Clone, Debug)]
+#[repr(C)] pub struct AggSigContext(c_int);
+
 /// Library-internal representation of a Secp256k1 public key
 #[repr(C)]
 pub struct PublicKey([c_uchar; 64]);
@@ -203,6 +208,14 @@ extern "C" {
                                    sig: *const RecoverableSignature,
                                    msg32: *const c_uchar)
                                    -> c_int;
+    // AGGSIG
+    pub fn secp256k1_aggsig_context_create(cx: *const Context,
+                                           pks: *const PublicKey,
+                                           n_pks: size_t,
+                                           seed32: *const c_uchar)
+                                           -> *mut AggSigContext;
+
+    pub fn secp256k1_aggsig_context_destroy(aggctx: *mut AggSigContext);
 
     // EC
     pub fn secp256k1_ec_seckey_verify(cx: *const Context,
