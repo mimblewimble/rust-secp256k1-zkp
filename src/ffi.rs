@@ -243,6 +243,20 @@ extern "C" {
                                          index: size_t)
                                            -> c_int;
 
+    pub fn secp256k1_aggsig_combine_signatures(cx: *const Context,
+                                         aggctx: *mut AggSigContext,
+                                         sig64: *mut Signature,
+                                         partial: *const AggSigPartialSignature,
+                                         index: size_t)
+                                           -> c_int;
+
+    pub fn secp256k1_aggsig_build_scratch_and_verify(cx: *const Context,
+                                                     sig64: *const Signature,
+                                                     msg32: *const c_uchar,
+                                                     pks: *const PublicKey,
+                                                     n_pubkeys: size_t)
+                                           -> c_int;
+
     // EC
     pub fn secp256k1_ec_seckey_verify(cx: *const Context,
                                       sk: *const c_uchar) -> c_int;
