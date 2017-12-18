@@ -23,18 +23,64 @@ use rand::{Rng, thread_rng};
 use {Message, Error, Signature, AggSigPartialSignature};
 use key::{SecretKey, PublicKey};
 
-/// Manages an instance of an aggsig context, and provides all methods
+/// Single-Signer (plain old Schnorr, sans-multisig) signature creation
+/// Returns: Ok(Signature) on success
+/// In: 
+/// msg: the message to sign
+/// seckey: the secret key
+#[deprecated(since="0.1.0", note="underlying aggisg api still subject to review and change")]
+pub fn sign_single(secp: &Secp256k1, msg:Message, seckey:SecretKey) ->
+                    Result<Signature, Error> {
+    let mut retsig = Signature::from(ffi::Signature::new());
+    let mut seed = [0; 32];
+    thread_rng().fill_bytes(&mut seed);
+    let retval = unsafe {
+        ffi::secp256k1_aggsig_sign_single(secp.ctx,
+                                          retsig.as_mut_ptr(),
+                                          msg.as_ptr(),
+                                          seckey.as_ptr(),
+                                          seed.as_ptr())
+    };
+    if retval == 0 {
+       return Err(Error::InvalidSignature);
+    }
+    Ok(retsig)
+}
+
+/// Single-Signer (plain old Schnorr, sans-multisig) signature verification
+/// Returns: Ok(Signature) on success
+/// In: 
+/// sig: The signature
+/// msg: the message to verify
+/// pubkey: the public key
+#[deprecated(since="0.1.0", note="underlying aggisg api still subject to review and change")]
+pub fn verify_single(secp: &Secp256k1, sig:Signature, msg:Message, pubkey:PublicKey) ->
+                     bool {
+    let retval = unsafe {
+        ffi::secp256k1_aggsig_verify_single(secp.ctx,
+                                            sig.as_ptr(),
+                                            msg.as_ptr(),
+                                            pubkey.as_ptr())
+    };
+    match retval {
+        0 => false,
+        1 => true,
+        _ => false,
+    }
+}
+
+/// Manages an instance of an aggsig multisig context, and provides all methods
 /// to act on that context
 #[derive(Clone, Debug)]
-pub struct AggSig {
+pub struct MultiSigContext {
     ctx: *mut ffi::Context,
     aggsig_ctx: *mut ffi::AggSigContext,
 }
 
-impl AggSig {
+impl MultiSigContext {
     /// Creates new aggsig context with a new random seed
     #[deprecated(since="0.1.0", note="underlying aggisg api still subject to review and change")]
-    pub fn new(secp: &Secp256k1, pubkeys: &Vec<PublicKey>) -> AggSig {
+    pub fn new(secp: &Secp256k1, pubkeys: &Vec<PublicKey>) -> MultiSigContext {
         let mut seed = [0; 32];
         thread_rng().fill_bytes(&mut seed);
         let pubkeys:Vec<*const ffi::PublicKey> = pubkeys.into_iter()
@@ -42,7 +88,7 @@ impl AggSig {
             .collect();
         let pubkeys = &pubkeys[..];
         unsafe {
-            AggSig{
+            MultiSigContext {
                 ctx: secp.ctx,
                 aggsig_ctx : ffi::secp256k1_aggsig_context_create(secp.ctx,
                                                                   pubkeys[0],
@@ -142,9 +188,10 @@ impl AggSig {
           _ => false,
         }
     }
+
 }
 
-impl Drop for AggSig {
+impl Drop for MultiSigContext {
     fn drop(&mut self) {
         unsafe { ffi::secp256k1_aggsig_context_destroy(self.aggsig_ctx); }
     }
@@ -155,12 +202,12 @@ mod tests {
     use ContextFlag;
     use {Message, AggSigPartialSignature};
     use ffi;
-    use super::{AggSig, Secp256k1};
+    use super::{MultiSigContext, Secp256k1, sign_single, verify_single};
     use rand::{Rng, thread_rng};
     use key::{SecretKey, PublicKey};
 
     #[test]
-    fn test_aggsig() {
+    fn test_aggsig_multisig() {
         let numkeys = 5;
         let secp = Secp256k1::with_caps(ContextFlag::Full);
         let mut keypairs:Vec<(SecretKey, PublicKey)> = vec![];
@@ -171,7 +218,7 @@ mod tests {
             .map(|(_,p)| p)
             .collect();
         println!("Creating aggsig context with {} pubkeys: {:?}", pks.len(), pks);
-        let aggsig = AggSig::new(&secp, &pks);
+        let aggsig = MultiSigContext::new(&secp, &pks);
         println!("Generating nonces for each index");
         for i in 0..numkeys {
            let retval=aggsig.generate_nonce(i);
@@ -209,6 +256,32 @@ mod tests {
         println!("Verifying Combined sig: {:?}, msg: {:?}, pks:{:?}", combined_sig, msg, pks);
         let result = aggsig.verify(combined_sig, msg, &pks);
         println!("Signature verification: {}", result);
+    }
+
+    #[test]
+    fn test_aggsig_single() {
+        let secp = Secp256k1::with_caps(ContextFlag::Full);
+        let (sk, pk) = secp.generate_keypair(&mut thread_rng()).unwrap();
+
+        println!("Performing aggsig single context with seckey, pubkey: {:?},{:?}", sk, pk);
+
+        let mut msg = [0u8; 32];
+        thread_rng().fill_bytes(&mut msg);
+        let msg = Message::from_slice(&msg).unwrap();
+        let sig=sign_single(&secp, msg, sk).unwrap();
+
+        println!("Verifying aggsig single: {:?}, msg: {:?}, pk:{:?}", sig, msg, pk);
+        let result = verify_single(&secp, sig, msg, pk);
+        println!("Signature verification single (correct): {}", result);
+        assert!(result==true);
+
+        let mut msg = [0u8; 32];
+        thread_rng().fill_bytes(&mut msg);
+        let msg = Message::from_slice(&msg).unwrap();
+        println!("Verifying aggsig single: {:?}, msg: {:?}, pk:{:?}", sig, msg, pk);
+        let result = verify_single(&secp, sig, msg, pk);
+        println!("Signature verification single (wrong message): {}", result);
+        assert!(result==false);
     }
 }
 

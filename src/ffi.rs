@@ -221,7 +221,7 @@ extern "C" {
                                    sig: *const RecoverableSignature,
                                    msg32: *const c_uchar)
                                    -> c_int;
-    // AGGSIG
+    // AGGSIG (Schnorr) Multisig
     pub fn secp256k1_aggsig_context_create(cx: *const Context,
                                            pks: *const PublicKey,
                                            n_pks: size_t,
@@ -255,6 +255,20 @@ extern "C" {
                                                      msg32: *const c_uchar,
                                                      pks: *const PublicKey,
                                                      n_pubkeys: size_t)
+                                           -> c_int;
+
+    // AGGSIG (plain single-signature Schnorr)
+    pub fn secp256k1_aggsig_sign_single(cx: *const Context,
+                                        sig: *mut Signature,
+                                        msg32: *const c_uchar,
+                                        seckey32: *const c_uchar,
+                                        seed32: *const c_uchar)
+                                           -> c_int;
+
+    pub fn secp256k1_aggsig_verify_single(cx: *const Context,
+                                          sig: *const Signature,
+                                          msg32: *const c_uchar,
+                                          pk: *const PublicKey)
                                            -> c_int;
 
     // EC
