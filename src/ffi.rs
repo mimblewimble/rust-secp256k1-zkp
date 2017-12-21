@@ -255,9 +255,14 @@ extern "C" {
                                                      msg32: *const c_uchar,
                                                      pks: *const PublicKey,
                                                      n_pubkeys: size_t)
-                                           -> c_int;
+                                                         -> c_int;
 
     // AGGSIG (plain single-signature Schnorr)
+    pub fn secp256k1_aggsig_export_secnonce_single(cx: *const Context,
+                                                   secnonce32: *mut c_uchar,
+                                                   seed32: *const c_uchar)
+                                                       -> c_int;
+
     pub fn secp256k1_aggsig_sign_single(cx: *const Context,
                                         sig: *mut Signature,
                                         msg32: *const c_uchar,

@@ -19,9 +19,31 @@
 
 use Secp256k1;
 use ffi;
-use rand::{Rng, thread_rng};
+use rand::{Rng, thread_rng, OsRng};
 use {Message, Error, Signature, AggSigPartialSignature};
 use key::{SecretKey, PublicKey};
+
+/// Single-Signer (plain old Schnorr, sans-multisig) export nonce
+/// Returns: Ok(SecretKey) on success
+/// In: 
+/// msg: the message to sign
+/// seckey: the secret key
+#[deprecated(since="0.1.0", note="underlying aggisg api still subject to review and change")]
+pub fn export_secnonce_single(secp: &Secp256k1) ->
+                       Result<SecretKey, Error> {
+    let mut return_key = SecretKey::new(&secp, &mut OsRng::new().unwrap());
+    let mut seed = [0; 32];
+    thread_rng().fill_bytes(&mut seed);
+    let retval = unsafe {
+        ffi::secp256k1_aggsig_export_secnonce_single(secp.ctx,
+                                          return_key.as_mut_ptr(),
+                                          seed.as_ptr())
+    };
+    if retval == 0 {
+       return Err(Error::InvalidSignature);
+    }
+    Ok(return_key)
+}
 
 /// Single-Signer (plain old Schnorr, sans-multisig) signature creation
 /// Returns: Ok(Signature) on success
@@ -72,15 +94,15 @@ pub fn verify_single(secp: &Secp256k1, sig:Signature, msg:Message, pubkey:Public
 /// Manages an instance of an aggsig multisig context, and provides all methods
 /// to act on that context
 #[derive(Clone, Debug)]
-pub struct MultiSigContext {
+pub struct AggSigContext {
     ctx: *mut ffi::Context,
     aggsig_ctx: *mut ffi::AggSigContext,
 }
 
-impl MultiSigContext {
+impl AggSigContext {
     /// Creates new aggsig context with a new random seed
     #[deprecated(since="0.1.0", note="underlying aggisg api still subject to review and change")]
-    pub fn new(secp: &Secp256k1, pubkeys: &Vec<PublicKey>) -> MultiSigContext {
+    pub fn new(secp: &Secp256k1, pubkeys: &Vec<PublicKey>) -> AggSigContext {
         let mut seed = [0; 32];
         thread_rng().fill_bytes(&mut seed);
         let pubkeys:Vec<*const ffi::PublicKey> = pubkeys.into_iter()
@@ -88,7 +110,7 @@ impl MultiSigContext {
             .collect();
         let pubkeys = &pubkeys[..];
         unsafe {
-            MultiSigContext {
+            AggSigContext {
                 ctx: secp.ctx,
                 aggsig_ctx : ffi::secp256k1_aggsig_context_create(secp.ctx,
                                                                   pubkeys[0],
@@ -191,7 +213,7 @@ impl MultiSigContext {
 
 }
 
-impl Drop for MultiSigContext {
+impl Drop for AggSigContext {
     fn drop(&mut self) {
         unsafe { ffi::secp256k1_aggsig_context_destroy(self.aggsig_ctx); }
     }
@@ -202,7 +224,7 @@ mod tests {
     use ContextFlag;
     use {Message, AggSigPartialSignature};
     use ffi;
-    use super::{MultiSigContext, Secp256k1, sign_single, verify_single};
+    use super::{AggSigContext, Secp256k1, sign_single, verify_single, export_secnonce_single};
     use rand::{Rng, thread_rng};
     use key::{SecretKey, PublicKey};
 
@@ -218,7 +240,7 @@ mod tests {
             .map(|(_,p)| p)
             .collect();
         println!("Creating aggsig context with {} pubkeys: {:?}", pks.len(), pks);
-        let aggsig = MultiSigContext::new(&secp, &pks);
+        let aggsig = AggSigContext::new(&secp, &pks);
         println!("Generating nonces for each index");
         for i in 0..numkeys {
            let retval=aggsig.generate_nonce(i);
@@ -282,6 +304,15 @@ mod tests {
         let result = verify_single(&secp, sig, msg, pk);
         println!("Signature verification single (wrong message): {}", result);
         assert!(result==false);
+    }
+
+    #[test]
+    fn test_aggsig_export_nonce() {
+        let secp = Secp256k1::with_caps(ContextFlag::Full);
+        let result = export_secnonce_single(&secp);
+
+        println!("Exported nonce (SecKey: {:?})", result.unwrap());
+
     }
 }
 
