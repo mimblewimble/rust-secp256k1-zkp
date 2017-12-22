@@ -267,6 +267,7 @@ extern "C" {
                                         sig: *mut Signature,
                                         msg32: *const c_uchar,
                                         seckey32: *const c_uchar,
+                                        secnonce32: *const c_uchar,
                                         seed32: *const c_uchar)
                                            -> c_int;
 

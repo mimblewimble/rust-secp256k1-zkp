@@ -50,8 +50,9 @@ pub fn export_secnonce_single(secp: &Secp256k1) ->
 /// In: 
 /// msg: the message to sign
 /// seckey: the secret key
+/// nonce: if Some(SecretKey), the secret nonce to use. If None, generate a nonce
 #[deprecated(since="0.1.0", note="underlying aggisg api still subject to review and change")]
-pub fn sign_single(secp: &Secp256k1, msg:Message, seckey:SecretKey) ->
+pub fn sign_single(secp: &Secp256k1, msg:Message, seckey:SecretKey, secnonce:Option<SecretKey>) ->
                     Result<Signature, Error> {
     let mut retsig = Signature::from(ffi::Signature::new());
     let mut seed = [0; 32];
@@ -61,6 +62,7 @@ pub fn sign_single(secp: &Secp256k1, msg:Message, seckey:SecretKey) ->
                                           retsig.as_mut_ptr(),
                                           msg.as_ptr(),
                                           seckey.as_ptr(),
+                                          secnonce.unwrap().as_ptr(),
                                           seed.as_ptr())
     };
     if retval == 0 {
@@ -290,7 +292,7 @@ mod tests {
         let mut msg = [0u8; 32];
         thread_rng().fill_bytes(&mut msg);
         let msg = Message::from_slice(&msg).unwrap();
-        let sig=sign_single(&secp, msg, sk).unwrap();
+        let sig=sign_single(&secp, msg, sk, None).unwrap();
 
         println!("Verifying aggsig single: {:?}, msg: {:?}, pk:{:?}", sig, msg, pk);
         let result = verify_single(&secp, sig, msg, pk);
@@ -304,6 +306,10 @@ mod tests {
         let result = verify_single(&secp, sig, msg, pk);
         println!("Signature verification single (wrong message): {}", result);
         assert!(result==false);
+
+        // with exported nonce
+        //let nonce = export_secnonce_single(&secp).unwrap();
+        //let sig=sign_single(&secp, msg, sk, Some(nonce)).unwrap();
     }
 
     #[test]
