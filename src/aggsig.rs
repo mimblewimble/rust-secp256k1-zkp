@@ -22,6 +22,7 @@ use ffi;
 use rand::{Rng, thread_rng, OsRng};
 use {Message, Error, Signature, AggSigPartialSignature};
 use key::{SecretKey, PublicKey};
+use std::ptr;
 
 /// Single-Signer (plain old Schnorr, sans-multisig) export nonce
 /// Returns: Ok(SecretKey) on success
@@ -51,18 +52,31 @@ pub fn export_secnonce_single(secp: &Secp256k1) ->
 /// msg: the message to sign
 /// seckey: the secret key
 /// nonce: if Some(SecretKey), the secret nonce to use. If None, generate a nonce
+/// nonce: if Some(PublicKey), overrides the public nonce to encode as part of e
 #[deprecated(since="0.1.0", note="underlying aggisg api still subject to review and change")]
-pub fn sign_single(secp: &Secp256k1, msg:Message, seckey:SecretKey, secnonce:Option<SecretKey>) ->
+pub fn sign_single(secp: &Secp256k1, msg:Message, seckey:SecretKey, secnonce:Option<SecretKey>, pubnonce:Option<PublicKey> ) ->
                     Result<Signature, Error> {
     let mut retsig = Signature::from(ffi::Signature::new());
     let mut seed = [0; 32];
     thread_rng().fill_bytes(&mut seed);
+
+    let secnonce = match secnonce {
+        Some(n) => n.as_ptr(),
+        None => ptr::null(),
+    };
+
+    let pubnonce = match pubnonce {
+        Some(n) => n.as_ptr(),
+        None => ptr::null(),
+    };
+
     let retval = unsafe {
         ffi::secp256k1_aggsig_sign_single(secp.ctx,
                                           retsig.as_mut_ptr(),
                                           msg.as_ptr(),
                                           seckey.as_ptr(),
-                                          secnonce.unwrap().as_ptr(),
+                                          secnonce,
+                                          pubnonce,
                                           seed.as_ptr())
     };
     if retval == 0 {
@@ -76,14 +90,21 @@ pub fn sign_single(secp: &Secp256k1, msg:Message, seckey:SecretKey, secnonce:Opt
 /// In: 
 /// sig: The signature
 /// msg: the message to verify
+/// pubnonce: if Some(PublicKey) overrides the public nonce used to calculate e
 /// pubkey: the public key
 #[deprecated(since="0.1.0", note="underlying aggisg api still subject to review and change")]
-pub fn verify_single(secp: &Secp256k1, sig:Signature, msg:Message, pubkey:PublicKey) ->
+pub fn verify_single(secp: &Secp256k1, sig:Signature, msg:Message, pubnonce:Option<PublicKey>, pubkey:PublicKey) ->
                      bool {
+    let pubnonce = match pubnonce {
+        Some(n) => n.as_ptr(),
+        None => ptr::null(),
+    };
+
     let retval = unsafe {
         ffi::secp256k1_aggsig_verify_single(secp.ctx,
                                             sig.as_ptr(),
                                             msg.as_ptr(),
+                                            pubnonce,
                                             pubkey.as_ptr())
     };
     match retval {
@@ -292,10 +313,10 @@ mod tests {
         let mut msg = [0u8; 32];
         thread_rng().fill_bytes(&mut msg);
         let msg = Message::from_slice(&msg).unwrap();
-        let sig=sign_single(&secp, msg, sk, None).unwrap();
+        let sig=sign_single(&secp, msg, sk, None, None).unwrap();
 
         println!("Verifying aggsig single: {:?}, msg: {:?}, pk:{:?}", sig, msg, pk);
-        let result = verify_single(&secp, sig, msg, pk);
+        let result = verify_single(&secp, sig, msg, None, pk);
         println!("Signature verification single (correct): {}", result);
         assert!(result==true);
 
@@ -303,7 +324,7 @@ mod tests {
         thread_rng().fill_bytes(&mut msg);
         let msg = Message::from_slice(&msg).unwrap();
         println!("Verifying aggsig single: {:?}, msg: {:?}, pk:{:?}", sig, msg, pk);
-        let result = verify_single(&secp, sig, msg, pk);
+        let result = verify_single(&secp, sig, msg, None, pk);
         println!("Signature verification single (wrong message): {}", result);
         assert!(result==false);
 
@@ -315,10 +336,27 @@ mod tests {
     #[test]
     fn test_aggsig_export_nonce() {
         let secp = Secp256k1::with_caps(ContextFlag::Full);
-        let result = export_secnonce_single(&secp);
+        let result = export_secnonce_single(&secp).unwrap();
 
-        println!("Exported nonce (SecKey: {:?})", result.unwrap());
+        println!("Exported nonce (SecKey: {:?})", result);
 
+        let (sk, pk) = secp.generate_keypair(&mut thread_rng()).unwrap();
+        //generate another 'nonce' to use in e instead
+        let (sk_nonce, pk_nonce) = secp.generate_keypair(&mut thread_rng()).unwrap();
+
+        let mut msg = [0u8; 32];
+        thread_rng().fill_bytes(&mut msg);
+        let msg = Message::from_slice(&msg).unwrap();
+
+        // Exported nonce and custom e = hash(m|pk)
+        //let sig=sign_single(&secp, msg, sk, Some(result), Some(pk_nonce)).unwrap();
+        let sig=sign_single(&secp, msg, sk, Some(result), Some(pk_nonce)).unwrap();
+
+        let result = verify_single(&secp, sig, msg, Some(pk_nonce), pk);
+        assert!(result==true);
+
+        let result = verify_single(&secp, sig, msg, None, pk);
+        assert!(result==false);
     }
 }
 

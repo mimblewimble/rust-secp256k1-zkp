@@ -268,12 +268,14 @@ extern "C" {
                                         msg32: *const c_uchar,
                                         seckey32: *const c_uchar,
                                         secnonce32: *const c_uchar,
+                                        pubnonce32: *const PublicKey,
                                         seed32: *const c_uchar)
                                            -> c_int;
 
     pub fn secp256k1_aggsig_verify_single(cx: *const Context,
                                           sig: *const Signature,
                                           msg32: *const c_uchar,
+                                          pubnonce32: *const PublicKey,
                                           pk: *const PublicKey)
                                            -> c_int;
 
