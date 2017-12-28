@@ -54,7 +54,7 @@ pub fn export_secnonce_single(secp: &Secp256k1) ->
 /// nonce: if Some(SecretKey), the secret nonce to use. If None, generate a nonce
 /// nonce: if Some(PublicKey), overrides the public nonce to encode as part of e
 #[deprecated(since="0.1.0", note="underlying aggisg api still subject to review and change")]
-pub fn sign_single(secp: &Secp256k1, msg:Message, seckey:SecretKey, secnonce:Option<SecretKey>, pubnonce:Option<PublicKey> ) ->
+pub fn sign_single(secp: &Secp256k1, msg:&Message, seckey:&SecretKey, secnonce:Option<&SecretKey>, pubnonce:Option<&PublicKey> ) ->
                     Result<Signature, Error> {
     let mut retsig = Signature::from(ffi::Signature::new());
     let mut seed = [0; 32];
@@ -93,7 +93,7 @@ pub fn sign_single(secp: &Secp256k1, msg:Message, seckey:SecretKey, secnonce:Opt
 /// pubnonce: if Some(PublicKey) overrides the public nonce used to calculate e
 /// pubkey: the public key
 #[deprecated(since="0.1.0", note="underlying aggisg api still subject to review and change")]
-pub fn verify_single(secp: &Secp256k1, sig:Signature, msg:Message, pubnonce:Option<PublicKey>, pubkey:PublicKey) ->
+pub fn verify_single(secp: &Secp256k1, sig:&Signature, msg:&Message, pubnonce:Option<&PublicKey>, pubkey:&PublicKey) ->
                      bool {
     let pubnonce = match pubnonce {
         Some(n) => n.as_ptr(),
@@ -313,10 +313,10 @@ mod tests {
         let mut msg = [0u8; 32];
         thread_rng().fill_bytes(&mut msg);
         let msg = Message::from_slice(&msg).unwrap();
-        let sig=sign_single(&secp, msg, sk, None, None).unwrap();
+        let sig=sign_single(&secp, &msg, &sk, None, None).unwrap();
 
         println!("Verifying aggsig single: {:?}, msg: {:?}, pk:{:?}", sig, msg, pk);
-        let result = verify_single(&secp, sig, msg, None, pk);
+        let result = verify_single(&secp, &sig, &msg, None, &pk);
         println!("Signature verification single (correct): {}", result);
         assert!(result==true);
 
@@ -324,38 +324,40 @@ mod tests {
         thread_rng().fill_bytes(&mut msg);
         let msg = Message::from_slice(&msg).unwrap();
         println!("Verifying aggsig single: {:?}, msg: {:?}, pk:{:?}", sig, msg, pk);
-        let result = verify_single(&secp, sig, msg, None, pk);
+        let result = verify_single(&secp, &sig, &msg, None, &pk);
         println!("Signature verification single (wrong message): {}", result);
         assert!(result==false);
-
-        // with exported nonce
-        //let nonce = export_secnonce_single(&secp).unwrap();
-        //let sig=sign_single(&secp, msg, sk, Some(nonce)).unwrap();
     }
 
     #[test]
     fn test_aggsig_export_nonce() {
         let secp = Secp256k1::with_caps(ContextFlag::Full);
-        let result = export_secnonce_single(&secp).unwrap();
+        let custom_nonce = export_secnonce_single(&secp).unwrap();
 
-        println!("Exported nonce (SecKey: {:?})", result);
+        println!("Exported nonce (SecKey: {:?})", custom_nonce);
 
         let (sk, pk) = secp.generate_keypair(&mut thread_rng()).unwrap();
         //generate another 'nonce' to use in e instead
-        let (sk_nonce, pk_nonce) = secp.generate_keypair(&mut thread_rng()).unwrap();
+        let (_sk_nonce, pk_nonce) = secp.generate_keypair(&mut thread_rng()).unwrap();
 
         let mut msg = [0u8; 32];
         thread_rng().fill_bytes(&mut msg);
         let msg = Message::from_slice(&msg).unwrap();
 
-        // Exported nonce and custom e = hash(m|pk)
-        //let sig=sign_single(&secp, msg, sk, Some(result), Some(pk_nonce)).unwrap();
-        let sig=sign_single(&secp, msg, sk, Some(result), Some(pk_nonce)).unwrap();
-
-        let result = verify_single(&secp, sig, msg, Some(pk_nonce), pk);
+        // Exported nonce 
+        let sig=sign_single(&secp, &msg, &sk, Some(&custom_nonce), None).unwrap();
+        let result = verify_single(&secp, &sig, &msg, None, &pk);
         assert!(result==true);
 
-        let result = verify_single(&secp, sig, msg, None, pk);
+        // Exported nonce and custom e = hash(m|pk)
+        println!("Custom pk nonce (for e): {:?})", pk_nonce);
+        let sig=sign_single(&secp, &msg, &sk, Some(&custom_nonce), Some(&pk_nonce)).unwrap();
+
+        println!("Custom pk nonce (for e): {:?})", pk_nonce);
+        let result = verify_single(&secp, &sig, &msg, Some(&pk_nonce), &pk);
+        assert!(result==true);
+
+        let result = verify_single(&secp, &sig, &msg, None, &pk);
         assert!(result==false);
     }
 }
