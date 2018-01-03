@@ -279,6 +279,13 @@ extern "C" {
                                           pk: *const PublicKey)
                                            -> c_int;
 
+    pub fn secp256k1_aggsig_add_signatures_single(cx: *const Context,
+                                                  sig: *mut Signature,
+                                                  sig1: *const Signature,
+                                                  sig2: *const Signature,
+                                                  pubnonce1: *const PublicKey,
+                                                  pubnonce2: *const PublicKey)
+                                                      -> c_int;
     // EC
     pub fn secp256k1_ec_seckey_verify(cx: *const Context,
                                       sk: *const c_uchar) -> c_int;

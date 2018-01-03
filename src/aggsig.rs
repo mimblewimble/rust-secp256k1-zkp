@@ -114,6 +114,34 @@ pub fn verify_single(secp: &Secp256k1, sig:&Signature, msg:&Message, pubnonce:Op
     }
 }
 
+/// Single-Signer addition of Signatures
+/// Returns: Ok(Signature) on success
+/// In: 
+/// sig1: sig1 to add
+/// sig2: sig2 to add
+/// pubnonce1: nonce1 to add
+/// pubnonce2: nonce2 to add
+#[deprecated(since="0.1.0", note="underlying aggisg api still subject to review and change")]
+pub fn add_signatures_single(secp: &Secp256k1,
+  sig1:&Signature,
+  sig2:&Signature,
+  pubnonce1:&PublicKey,
+  pubnonce2:&PublicKey) -> Result<Signature, Error> {
+    let mut retsig = Signature::from(ffi::Signature::new());
+    let retval = unsafe {
+        ffi::secp256k1_aggsig_add_signatures_single(secp.ctx,
+                                                    retsig.as_mut_ptr(),
+                                                    sig1.as_ptr(),
+                                                    sig2.as_ptr(),
+                                                    pubnonce1.as_ptr(),
+                                                    pubnonce2.as_ptr())
+    };
+    if retval == 0 {
+       return Err(Error::InvalidSignature);
+    }
+    Ok(retsig)
+}
+
 /// Manages an instance of an aggsig multisig context, and provides all methods
 /// to act on that context
 #[derive(Clone, Debug)]
@@ -247,7 +275,7 @@ mod tests {
     use ContextFlag;
     use {Message, AggSigPartialSignature};
     use ffi;
-    use super::{AggSigContext, Secp256k1, sign_single, verify_single, export_secnonce_single};
+    use super::{AggSigContext, Secp256k1, sign_single, verify_single, export_secnonce_single, add_signatures_single};
     use rand::{Rng, thread_rng};
     use key::{SecretKey, PublicKey};
 
@@ -359,6 +387,8 @@ mod tests {
 
         let result = verify_single(&secp, &sig, &msg, None, &pk);
         assert!(result==false);
+
+        let result = add_signatures_single(&secp, &sig, &sig, &pk_nonce, &pk_nonce).unwrap();
     }
 }
 
