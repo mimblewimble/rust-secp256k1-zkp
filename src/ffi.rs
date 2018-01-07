@@ -257,7 +257,7 @@ extern "C" {
                                                      n_pubkeys: size_t)
                                                          -> c_int;
 
-    // AGGSIG (plain single-signature Schnorr)
+    // AGGSIG (single sig or single-signer Schnorr)
     pub fn secp256k1_aggsig_export_secnonce_single(cx: *const Context,
                                                    secnonce32: *mut c_uchar,
                                                    seed32: *const c_uchar)
@@ -268,7 +268,8 @@ extern "C" {
                                         msg32: *const c_uchar,
                                         seckey32: *const c_uchar,
                                         secnonce32: *const c_uchar,
-                                        pubnonce: *const PublicKey,
+                                        pubnonce_for_e: *const PublicKey,
+                                        pubnonce_total: *const PublicKey,
                                         seed32: *const c_uchar)
                                            -> c_int;
 
@@ -276,15 +277,15 @@ extern "C" {
                                           sig: *const Signature,
                                           msg32: *const c_uchar,
                                           pubnonce: *const PublicKey,
-                                          pk: *const PublicKey)
+                                          pk: *const PublicKey,
+                                          is_partial: c_uint)
                                            -> c_int;
 
     pub fn secp256k1_aggsig_add_signatures_single(cx: *const Context,
                                                   sig: *mut Signature,
                                                   sig1: *const Signature,
                                                   sig2: *const Signature,
-                                                  pubnonce1: *const PublicKey,
-                                                  pubnonce2: *const PublicKey)
+                                                  pubnonce_total: *const PublicKey)
                                                       -> c_int;
     // EC
     pub fn secp256k1_ec_seckey_verify(cx: *const Context,
