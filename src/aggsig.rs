@@ -369,37 +369,55 @@ mod tests {
     }
 
     #[test]
-    fn test_aggsig_export_nonce() {
-        let secp = Secp256k1::with_caps(ContextFlag::Full);
-        let custom_nonce = export_secnonce_single(&secp).unwrap();
+    fn test_aggsig_exchange() {
+        for _ in 0 .. 20 {
+            let secp = Secp256k1::with_caps(ContextFlag::Full);
+            // Generate keys for sender, receiver
+            let (sk1, pk1) = secp.generate_keypair(&mut thread_rng()).unwrap();
+            let (sk2, pk2) = secp.generate_keypair(&mut thread_rng()).unwrap();
 
-        println!("Exported nonce (SecKey: {:?})", custom_nonce);
+            // Generate nonces for sender, receiver
+            let secnonce_1 = export_secnonce_single(&secp).unwrap();
+            let secnonce_2 = export_secnonce_single(&secp).unwrap();
 
-        let (sk, pk) = secp.generate_keypair(&mut thread_rng()).unwrap();
-        //generate another 'nonce' to use in e instead
-        let (_sk_nonce, pk_nonce) = secp.generate_keypair(&mut thread_rng()).unwrap();
+            // Calculate public nonces
+            let pubnonce_1 = PublicKey::from_secret_key(&secp, &secnonce_1).unwrap();
+            let pubnonce_2 = PublicKey::from_secret_key(&secp, &secnonce_2).unwrap();
 
-        let mut msg = [0u8; 32];
-        thread_rng().fill_bytes(&mut msg);
-        let msg = Message::from_slice(&msg).unwrap();
+            // And get the total
+            let mut nonce_sum = pubnonce_2.clone();
+            let _ = nonce_sum.add_exp_assign(&secp, &secnonce_1);
 
-        // Exported nonce 
-        let sig=sign_single(&secp, &msg, &sk, Some(&custom_nonce), None, None).unwrap();
-        let result = verify_single(&secp, &sig, &msg, None, &pk, false);
-        assert!(result==true);
+            // Random message
+            let mut msg = [0u8; 32];
+            thread_rng().fill_bytes(&mut msg);
+            let msg = Message::from_slice(&msg).unwrap();
 
-        // Exported nonce and custom e = hash(m|pk)
-        println!("Custom pk nonce (for e): {:?})", pk_nonce);
-        let sig=sign_single(&secp, &msg, &sk, Some(&custom_nonce), Some(&pk_nonce), None).unwrap();
+            // Receiver signs 
+            let sig1=sign_single(&secp, &msg, &sk1, Some(&secnonce_1), Some(&nonce_sum), Some(&nonce_sum)).unwrap();
 
-        println!("Custom pk nonce (for e): {:?})", pk_nonce);
-        let result = verify_single(&secp, &sig, &msg, Some(&pk_nonce), &pk, false);
-        assert!(result==true);
+            // Sender verifies receivers sig
+            let result = verify_single(&secp, &sig1, &msg, Some(&nonce_sum), &pk1, true);
+            assert!(result==true);
 
-        let result = verify_single(&secp, &sig, &msg, None, &pk, false);
-        assert!(result==false);
+            // Sender signs 
+            let sig2=sign_single(&secp, &msg, &sk2, Some(&secnonce_2), Some(&nonce_sum), Some(&nonce_sum)).unwrap();
 
-        let result = add_signatures_single(&secp, &sig, &sig, &pk_nonce).unwrap();
+            // Receiver verifies sender's sig
+            let result = verify_single(&secp, &sig2, &msg, Some(&nonce_sum), &pk2, true);
+            assert!(result==true);
+
+            // Receiver calculates final sig
+            let final_sig = add_signatures_single(&secp, &sig1, &sig2, &nonce_sum).unwrap();
+
+            // Add public keys
+            let mut pk_sum = pk2.clone();
+            let _ = pk_sum.add_exp_assign(&secp, &sk1);
+
+            // Verification of final sig:
+            let result = verify_single(&secp, &final_sig, &msg, None, &pk_sum, false);
+            assert!(result==true);
+        }
     }
 }
 
