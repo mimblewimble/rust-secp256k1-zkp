@@ -58,7 +58,7 @@ impl Commitment {
 	/// we just don't know which is which...
 	/// once secp provides the necessary api we will no longer need this hack
 	/// grin uses the public key to verify signatures (hopefully one of these keys works)
-	fn to_two_pubkeys(&self, secp: &Secp256k1) -> [key::PublicKey; 2] {
+	pub fn to_two_pubkeys(&self, secp: &Secp256k1) -> [key::PublicKey; 2] {
 		let mut pk1 = [0; constants::COMPRESSED_PUBLIC_KEY_SIZE];
 		for i in 0..self.0.len() {
 			if i == 0 {
