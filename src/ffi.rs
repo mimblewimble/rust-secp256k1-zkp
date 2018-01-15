@@ -73,7 +73,7 @@ impl PublicKey {
 
 /// Library-internal representation of a Secp256k1 signature
 #[repr(C)]
-pub struct Signature([c_uchar; 64]);
+pub struct Signature(pub [c_uchar; 64]);
 impl_array_newtype!(Signature, c_uchar, 64);
 impl_raw_debug!(Signature);
 
@@ -92,6 +92,8 @@ impl_raw_debug!(AggSigPartialSignature);
 impl Signature {
     /// Create a new (zeroed) signature usable for the FFI interface
     pub fn new() -> Signature { Signature([0; 64]) }
+    /// Create a signature from raw data
+    pub fn from_data(data: [u8; 64]) -> Signature { Signature(data) }
     /// Create a new (uninitialized) signature usable for the FFI interface
     pub unsafe fn blank() -> Signature { mem::uninitialized() }
 }

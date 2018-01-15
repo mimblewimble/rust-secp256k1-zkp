@@ -32,6 +32,9 @@ pub const UNCOMPRESSED_PUBLIC_KEY_SIZE: usize = 65;
 /// The size (in bytes) of a compressed public key
 pub const COMPRESSED_PUBLIC_KEY_SIZE: usize = 33;
 
+/// The size of an agg sig
+pub const AGG_SIGNATURE_SIZE: usize = 64;
+ 
 /// The maximum size of a signature
 pub const MAX_SIGNATURE_SIZE: usize = 72;
 

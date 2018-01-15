@@ -138,6 +138,11 @@ impl Signature {
         }
     }
 
+    /// Stores raw bytes provided as a signature, with no conversion
+    pub fn from_raw_data(data: &[u8;64]) -> Result<Signature, Error> {
+        Ok(Signature(ffi::Signature::from_data(data.clone())))
+    }
+
     /// Converts a "lax DER"-encoded byte slice to a signature. This is basically
     /// only useful for validating signatures in the Bitcoin blockchain from before
     /// 2016. It should never be used in new applications. This library does not
@@ -216,6 +221,12 @@ impl Signature {
             debug_assert!(err == 1);
         }
         ret
+    }
+
+    #[inline]
+    /// Just return raw data, no conversion tricks
+    pub fn to_raw_data(&self) -> [u8; 64] {
+        (self.0).0.clone()
     }
 }
 
