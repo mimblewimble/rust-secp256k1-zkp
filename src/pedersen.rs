@@ -18,6 +18,7 @@
 use std::cmp::min;
 use std::fmt;
 use std::mem;
+use std::u64;
 use libc::size_t;
 
 use ContextFlag;
@@ -638,6 +639,100 @@ impl Secp256k1 {
 			mantissa: mantissa,
 		}
 	}
+
+	/// EXPERIMENTAL 
+	/// Produces a bullet proof for the provided value, using min and max
+	/// bounds, relying on the blinding factor and value
+	#[deprecated(since="0.1.0", note="Experimental - underlying code unreviewed and subject to change")]
+	pub fn bullet_proof(
+		&self,
+		value: u64,
+		blind: SecretKey
+	) -> RangeProof {
+		let mut retried = false;
+		let mut proof = [0; constants::MAX_PROOF_SIZE];
+		let mut plen = constants::MAX_PROOF_SIZE as size_t;
+
+		let blind_vec:Vec<[u8;constants::SECRET_KEY_SIZE]> = vec![blind.0];
+		let blind_vec = &blind_vec[..];
+		let n_bits = 64;
+
+		// use a "known key" as the nonce, specifically the blinding factor
+		// of the commitment for which we are generating the range proof
+		// so we can later recover the value and the message by unwinding the range proof
+		// with the same nonce
+		let nonce = blind.clone();
+
+		let extra_commit = [0u8; 33];
+
+		// TODO - confirm this reworked retry logic works as expected
+		// pretty sure the original approach retried on success (so twice in total)
+		// and just kept looping forever on error
+		println!("blind_vec: {:?}", blind_vec);
+		loop {
+			let success = unsafe {
+				// because: "This can randomly fail with probability around one in 2^100.
+				// If this happens, buy a lottery ticket and retry."
+				ffi::secp256k1_bulletproof_rangeproof_prove_single_w_scratch(
+					self.ctx,
+					proof.as_mut_ptr(),
+					&mut plen,
+					value,
+					blind_vec[0].as_ptr(),
+					constants::GENERATOR_H.as_ptr(),
+					n_bits as size_t,
+					nonce.as_ptr(),
+					extra_commit.as_ptr(),
+					0 as size_t,
+				) == 1
+			};
+			// break out of the loop immediately on success or
+			// or on the 2nd attempt if we retried
+			if success || retried {
+				break;
+			} else {
+				retried = true;
+			}
+		}
+		RangeProof {
+			proof: proof,
+			plen: plen as usize,
+		}
+	}
+
+	/// Verify with bullet proof that a committed value is positive
+	#[deprecated(since="0.1.0", note="Experimental - underlying code unreviewed and subject to change")]
+	pub fn verify_bullet_proof(
+		&self,
+		commit: Commitment,
+		proof: RangeProof
+	) -> Result<ProofRange, Error> {
+		let n_bits = 64;
+
+		let extra_commit = [0u8; 33];
+
+		let success = unsafe {
+			ffi::secp256k1_bulletproof_rangeproof_verify_single_w_scratch(
+				self.ctx,
+				proof.proof.as_ptr(),
+				proof.plen as size_t,
+				commit.as_ptr(),
+				n_bits as size_t,
+				constants::GENERATOR_H.as_ptr(),
+				extra_commit.as_ptr(),
+				0 as size_t
+			 ) == 1
+		};
+
+		if success {
+			Ok(ProofRange {
+				min: 0,
+				max: u64::MAX,
+			})
+		} else {
+			Err(Error::InvalidRangeProof)
+		}
+	}
 }
 
 #[cfg(test)]
@@ -846,5 +941,36 @@ mod tests {
 		assert!(proof_info.success);
 		assert_eq!(proof_info.min, 0);
 		assert_eq!(proof_info.value, 0);
+	}
+
+	#[test]
+	fn test_bullet_proof() {
+		let secp = Secp256k1::with_caps(ContextFlag::Commit);
+		let blinding = SecretKey::new(&secp, &mut OsRng::new().unwrap());
+		let value = 12345678;
+		let commit = secp.commit(value, blinding).unwrap();
+		let bullet_proof = secp.bullet_proof(value, blinding);
+
+		// correct verification
+		println!("Bullet proof len: {}", bullet_proof.plen);
+		let proof_range = secp.verify_bullet_proof(commit, bullet_proof).unwrap();
+		assert_eq!(proof_range.min, 0);
+
+		// wrong value committed to
+		let value = 12345678;
+		let commit = secp.commit(87654321, blinding).unwrap();
+		let bullet_proof = secp.bullet_proof(value, blinding);
+		if !secp.verify_bullet_proof(commit, bullet_proof).is_err(){
+			panic!("Bullet proof verify should have errored");
+		}
+
+		// wrong blinding
+		let value = 12345678;
+		let commit = secp.commit(value, blinding).unwrap();
+		let blinding = SecretKey::new(&secp, &mut OsRng::new().unwrap());
+		let bullet_proof = secp.bullet_proof(value, blinding);
+		if !secp.verify_bullet_proof(commit, bullet_proof).is_err(){
+			panic!("Bullet proof verify should have errored");
+		}
 	}
 }

@@ -42,6 +42,7 @@ fn main() {
                .define("ENABLE_MODULE_GENERATOR", Some("1"))
                .define("ENABLE_MODULE_RECOVERY", Some("1"))
                .define("ENABLE_MODULE_RANGEPROOF", Some("1"))
+               .define("ENABLE_MODULE_BULLETPROOF", Some("1"))
                .define("ENABLE_MODULE_AGGSIG", Some("1"));
 
     // secp256k1-zkp

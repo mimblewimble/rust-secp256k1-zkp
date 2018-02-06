@@ -29,7 +29,7 @@ use std::ptr;
 /// In: 
 /// msg: the message to sign
 /// seckey: the secret key
-#[deprecated(since="0.1.0", note="underlying aggisg api still subject to review and change")]
+#[deprecated(since="0.1.0", note="underlying aggsig api still subject to review and change")]
 pub fn export_secnonce_single(secp: &Secp256k1) ->
                        Result<SecretKey, Error> {
     let mut return_key = SecretKey::new(&secp, &mut OsRng::new().unwrap());
