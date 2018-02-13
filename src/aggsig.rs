@@ -54,7 +54,7 @@ pub fn export_secnonce_single(secp: &Secp256k1) ->
 /// secnonce: if Some(SecretKey), the secret nonce to use. If None, generate a nonce
 /// pubnonce: if Some(PublicKey), overrides the public nonce to encode as part of e
 /// final_nonce_sum: if Some(PublicKey), overrides the public nonce to encode as part of e
-#[deprecated(since="0.1.0", note="underlying aggisg api still subject to review and change")]
+#[deprecated(since="0.1.0", note="underlying aggsig api still subject to review and change")]
 pub fn sign_single(secp: &Secp256k1, msg:&Message, seckey:&SecretKey, secnonce:Option<&SecretKey>, pubnonce:Option<&PublicKey>, final_nonce_sum:Option<&PublicKey> ) ->
                     Result<Signature, Error> {
     let mut retsig = Signature::from(ffi::Signature::new());
@@ -100,7 +100,7 @@ pub fn sign_single(secp: &Secp256k1, msg:&Message, seckey:&SecretKey, secnonce:O
 /// pubnonce: if Some(PublicKey) overrides the public nonce used to calculate e
 /// pubkey: the public key
 /// is_partial: whether this is a partial sig, or a fully-combined sig
-#[deprecated(since="0.1.0", note="underlying aggisg api still subject to review and change")]
+#[deprecated(since="0.1.0", note="underlying aggsig api still subject to review and change")]
 pub fn verify_single(secp: &Secp256k1, sig:&Signature, msg:&Message, pubnonce:Option<&PublicKey>, pubkey:&PublicKey, is_partial: bool) ->
                      bool {
     let pubnonce = match pubnonce {
@@ -134,7 +134,7 @@ pub fn verify_single(secp: &Secp256k1, sig:&Signature, msg:&Message, pubnonce:Op
 /// sig1: sig1 to add
 /// sig2: sig2 to add
 /// pubnonce_total: sum of public nonces
-#[deprecated(since="0.1.0", note="underlying aggisg api still subject to review and change")]
+#[deprecated(since="0.1.0", note="underlying aggsig api still subject to review and change")]
 pub fn add_signatures_single(secp: &Secp256k1,
   sig1:&Signature,
   sig2:&Signature,
@@ -163,7 +163,7 @@ pub struct AggSigContext {
 
 impl AggSigContext {
     /// Creates new aggsig context with a new random seed
-    #[deprecated(since="0.1.0", note="underlying aggisg api still subject to review and change")]
+    #[deprecated(since="0.1.0", note="underlying aggsig api still subject to review and change")]
     pub fn new(secp: &Secp256k1, pubkeys: &Vec<PublicKey>) -> AggSigContext {
         let mut seed = [0; 32];
         thread_rng().fill_bytes(&mut seed);
@@ -204,7 +204,7 @@ impl AggSigContext {
     /// msg: the message to sign
     /// seckey: the secret key
     /// index: which index to generate a partial sig for
-    #[deprecated(since="0.1.0", note="underlying aggisg api still subject to review and change")]
+    #[deprecated(since="0.1.0", note="underlying aggsig api still subject to review and change")]
     pub fn partial_sign(&self, msg:Message, seckey:SecretKey, index: usize) ->
                         Result<AggSigPartialSignature, Error> {
         let mut retsig = AggSigPartialSignature::from(ffi::AggSigPartialSignature::new());
