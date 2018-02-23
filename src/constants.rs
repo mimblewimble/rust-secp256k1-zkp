@@ -48,8 +48,10 @@ pub const PEDERSEN_COMMITMENT_SIZE: usize = 33;
 pub const MAX_PROOF_SIZE: usize = 5134;
 
 /// The maximum size of a message embedded in a range proof
-// pub const PROOF_MSG_SIZE: usize = 4096;
 pub const PROOF_MSG_SIZE: usize = 2048;
+
+/// The maximum size of a message embedded in a bullet proof
+pub const BULLET_PROOF_MSG_SIZE: usize = 64;
 
 /// The order of the secp256k1 curve
 pub const CURVE_ORDER: [u8; 32] = [

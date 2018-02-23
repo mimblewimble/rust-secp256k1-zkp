@@ -643,13 +643,14 @@ impl Secp256k1 {
 
 	/// EXPERIMENTAL 
 	/// Produces a bullet proof for the provided value, using min and max
-	/// bounds, relying on the blinding factor and value
+	/// bounds, relying on the blinding factor and value. If a message is passed,
+	/// it will be truncated to 64 bytes
 	#[deprecated(since="0.1.0", note="Experimental - underlying code unreviewed and subject to change")]
 	pub fn bullet_proof(
 		&self,
 		value: u64,
 		blind: SecretKey,
-		message: Option<[u8;64]>,
+		message: Option<ProofMessage>,
 	) -> RangeProof {
 		let mut retried = false;
 		let mut proof = [0; constants::MAX_PROOF_SIZE];
@@ -660,7 +661,10 @@ impl Secp256k1 {
 		let n_bits = 64;
 
 		let message_ptr = match message {
-				Some(m) => m.to_vec().as_ptr(),
+				Some(mut m) => {
+					m.truncate(constants::BULLET_PROOF_MSG_SIZE);
+					m.as_ptr()
+				},
 				None => ptr::null(),
 		};
 
@@ -747,7 +751,7 @@ impl Secp256k1 {
 		commit: Commitment,
 		nonce: SecretKey,
 		proof: RangeProof
-	) -> Result<[u8; 64], Error> {
+	) -> Result<ProofMessage, Error> {
 		let n_bits = 64;
 
 		let extra_commit = [0u8; 33];
@@ -769,7 +773,7 @@ impl Secp256k1 {
 		};
 
 		if success {
-			Ok(message)
+			Ok(ProofMessage::from_bytes(&message))
 		} else {
 			Err(Error::InvalidRangeProof)
 		}
@@ -1026,22 +1030,24 @@ mod tests {
 			print!("{} ", message[i]);
 		}
 		println!();
-		let bullet_proof = secp.bullet_proof(value, blinding, Some(message));
+		let bullet_proof = secp.bullet_proof(value, blinding, Some(ProofMessage::from_bytes(&message)));
 		// Unwind message with same blinding factor
 		let recovered_message = secp.unwind_bullet_proof(commit, blinding, bullet_proof).unwrap();
+		let message_bytes = recovered_message.as_bytes().clone();
 		print!("Recovered message: ");
-		for i in 0..recovered_message.len() {
-			print!("{} ", recovered_message[i]);
-			assert_eq!(message[i], recovered_message[i]);
+		for i in 0..message_bytes.len() {
+			print!("{} ", message_bytes[i]);
+			assert_eq!(message[i], message_bytes[i]);
 		}
 		println!();
 		// Wrong blinding should give us nonsense
 		let blinding = SecretKey::new(&secp, &mut OsRng::new().unwrap());
 		let recovered_message = secp.unwind_bullet_proof(commit, blinding, bullet_proof).unwrap();
+		let message_bytes = recovered_message.as_bytes().clone();
 		print!("Recovered message w/ incorrect blinding: ");
 		let mut matches = true;
-		for i in 0..recovered_message.len() {
-			if recovered_message[i] != message[i] {
+		for i in 0..message_bytes.len() {
+			if message_bytes[i] != message[i] {
 				matches = false;
 				break;
 			}
