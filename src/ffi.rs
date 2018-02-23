@@ -450,7 +450,8 @@ extern "C" {
 		nbits: size_t,
 		nonce: *const c_uchar,
 		extra_commit: *const c_uchar,
-		extra_commit_len: size_t
+		extra_commit_len: size_t,
+		message: *const c_uchar
 	) -> c_int;
 
 	pub fn secp256k1_bulletproof_rangeproof_verify_single_w_scratch(
@@ -462,5 +463,18 @@ extern "C" {
 		gen: *const c_uchar,
 		extra_commit: *const c_uchar,
 		extra_commit_len: size_t
+	) -> c_int;
+
+	pub fn secp256k1_bulletproof_rangeproof_unwind_message(
+		ctx: *const Context,
+		proof: *const c_uchar,
+		plen: size_t,
+		commit: *const c_uchar,
+		nbits: size_t,
+		gen: *const c_uchar,
+		extra_commit: *const c_uchar,
+		extra_commit_len: size_t,
+		nonce: *const c_uchar,
+		message: *mut c_uchar,
 	) -> c_int;
 }
