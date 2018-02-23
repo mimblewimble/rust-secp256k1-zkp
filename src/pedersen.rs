@@ -659,8 +659,8 @@ impl Secp256k1 {
 		let blind_vec = &blind_vec[..];
 		let n_bits = 64;
 
-		let message = match message {
-				Some(m) => m.as_ptr(),
+		let message_ptr = match message {
+				Some(m) => m.to_vec().as_ptr(),
 				None => ptr::null(),
 		};
 
@@ -671,7 +671,6 @@ impl Secp256k1 {
 		let nonce = blind.clone();
 
 		let extra_commit = [0u8; 33];
-
 		// TODO - confirm this reworked retry logic works as expected
 		// pretty sure the original approach retried on success (so twice in total)
 		// and just kept looping forever on error
@@ -690,7 +689,7 @@ impl Secp256k1 {
 					nonce.as_ptr(),
 					extra_commit.as_ptr(),
 					0 as size_t,
-					message
+					message_ptr
 				) == 1
 			};
 			// break out of the loop immediately on success or
@@ -1032,8 +1031,8 @@ mod tests {
 		let recovered_message = secp.unwind_bullet_proof(commit, blinding, bullet_proof).unwrap();
 		print!("Recovered message: ");
 		for i in 0..recovered_message.len() {
-			assert_eq!(message[i], recovered_message[i]);
 			print!("{} ", recovered_message[i]);
+			assert_eq!(message[i], recovered_message[i]);
 		}
 		println!();
 		// Wrong blinding should give us nonsense
