@@ -23,6 +23,7 @@ path = "src/lib.rs"
 [features]
 unstable = []
 default = []
+bullet-proof-sizing = []
 dev = ["clippy"]
 
 [dependencies]

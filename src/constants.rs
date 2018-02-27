@@ -44,10 +44,16 @@ pub const COMPACT_SIGNATURE_SIZE: usize = 64;
 /// The size of a Pedersen commitment
 pub const PEDERSEN_COMMITMENT_SIZE: usize = 33;
 
+#[cfg(feature = "bullet-proof-sizing")]
+pub const MAX_PROOF_SIZE: usize = 674;
 /// The max size of a range proof
+#[cfg(not(feature = "bullet-proof-sizing"))]
 pub const MAX_PROOF_SIZE: usize = 5134;
 
 /// The maximum size of a message embedded in a range proof
+#[cfg(not(feature = "bullet-proof-sizing"))]
+pub const PROOF_MSG_SIZE: usize = 2048;
+#[cfg(feature = "bullet-proof-sizing")]
 pub const PROOF_MSG_SIZE: usize = 2048;
 
 /// The maximum size of a message embedded in a bullet proof
