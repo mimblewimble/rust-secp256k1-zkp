@@ -474,6 +474,7 @@ extern "C" {
 		gen: *const c_uchar,
 		extra_commit: *const c_uchar,
 		extra_commit_len: size_t,
+		blind: *const c_uchar,
 		nonce: *const c_uchar,
 		message: *mut c_uchar,
 	) -> c_int;
