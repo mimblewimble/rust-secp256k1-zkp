@@ -650,6 +650,7 @@ impl Secp256k1 {
 		&self,
 		value: u64,
 		blind: SecretKey,
+		nonce: SecretKey,
 		extra_data: Option<Vec<u8>>,
 		message: Option<ProofMessage>,
 	) -> RangeProof {
@@ -675,12 +676,6 @@ impl Secp256k1 {
 				},
 				None => vec![],
 		};
-
-		// use a "known key" as the nonce, specifically the blinding factor
-		// of the commitment for which we are generating the range proof
-		// so we can later recover the value and the message by unwinding the range proof
-		// with the same nonce
-		let nonce = blind.clone();
 
 		// TODO - confirm this reworked retry logic works as expected
 		// pretty sure the original approach retried on success (so twice in total)
@@ -1017,7 +1012,7 @@ mod tests {
 		let blinding = SecretKey::new(&secp, &mut OsRng::new().unwrap());
 		let value = 12345678;
 		let commit = secp.commit(value, blinding).unwrap();
-		let bullet_proof = secp.bullet_proof(value, blinding, None, None);
+		let bullet_proof = secp.bullet_proof(value, blinding, blinding, None, None);
 
 		// correct verification
 		println!("Bullet proof len: {}", bullet_proof.plen);
@@ -1027,7 +1022,7 @@ mod tests {
 		// wrong value committed to
 		let value = 12345678;
 		let wrong_commit = secp.commit(87654321, blinding).unwrap();
-		let bullet_proof = secp.bullet_proof(value, blinding, None, None);
+		let bullet_proof = secp.bullet_proof(value, blinding, blinding, None, None);
 		if !secp.verify_bullet_proof(wrong_commit, bullet_proof, None).is_err(){
 			panic!("Bullet proof verify should have errored");
 		}
@@ -1036,7 +1031,7 @@ mod tests {
 		let value = 12345678;
 		let commit = secp.commit(value, blinding).unwrap();
 		let blinding = SecretKey::new(&secp, &mut OsRng::new().unwrap());
-		let bullet_proof = secp.bullet_proof(value, blinding, None, None);
+		let bullet_proof = secp.bullet_proof(value, blinding, blinding, None, None);
 		if !secp.verify_bullet_proof(commit, bullet_proof, None).is_err(){
 			panic!("Bullet proof verify should have errored");
 		}
@@ -1046,7 +1041,7 @@ mod tests {
 		let blinding = SecretKey::new(&secp, &mut OsRng::new().unwrap());
 		let value = 12345678;
 		let commit = secp.commit(value, blinding).unwrap();
-		let bullet_proof = secp.bullet_proof(value, blinding, Some(extra_data.clone()), None);
+		let bullet_proof = secp.bullet_proof(value, blinding, blinding, Some(extra_data.clone()), None);
 		if secp.verify_bullet_proof(commit, bullet_proof, Some(extra_data.clone())).is_err(){
 			panic!("Bullet proof verify should NOT have errored.");
 		}
@@ -1061,6 +1056,7 @@ mod tests {
 
 		// Embed message into rangeproof with extra data
 		let blinding = SecretKey::new(&secp, &mut OsRng::new().unwrap());
+		let nonce = SecretKey::new(&secp, &mut OsRng::new().unwrap());
 		let value = 12345678;
 		let commit = secp.commit(value, blinding).unwrap();
 		let mut message = [0u8;64];
@@ -1070,9 +1066,9 @@ mod tests {
 			print!("{} ", message[i]);
 		}
 		println!();
-		let bullet_proof = secp.bullet_proof(value, blinding, Some(extra_data.clone()), Some(ProofMessage::from_bytes(&message)));
+		let bullet_proof = secp.bullet_proof(value, blinding, nonce, Some(extra_data.clone()), Some(ProofMessage::from_bytes(&message)));
 		// Unwind message with same blinding factor
-		let recovered_message = secp.unwind_bullet_proof(commit, blinding, blinding, Some(extra_data.clone()), bullet_proof).unwrap();
+		let recovered_message = secp.unwind_bullet_proof(commit, blinding, nonce, Some(extra_data.clone()), bullet_proof).unwrap();
 		let message_bytes = recovered_message.as_bytes().clone();
 		print!("Recovered message: ");
 		for i in 0..message_bytes.len() {
