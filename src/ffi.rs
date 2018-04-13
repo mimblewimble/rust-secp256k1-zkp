@@ -58,6 +58,20 @@ pub type NonceFn = unsafe extern "C" fn(nonce32: *mut c_uchar,
 #[derive(Clone, Debug)]
 #[repr(C)] pub struct AggSigContext(c_int);
 
+/// Secp256k1 scratch space
+#[derive(Clone, Debug)]
+#[repr(C)] pub struct ScratchSpace(c_int);
+
+/// Secp256k1 bulletproof generators
+#[derive(Clone, Debug)]
+#[repr(C)] pub struct BulletproofGenerators(c_int);
+
+/// Generator
+#[repr(C)] 
+pub struct Generator(pub [c_uchar; 33]);
+impl_array_newtype!(Generator, c_uchar, 33);
+impl_raw_debug!(Generator);
+
 /// Library-internal representation of a Secp256k1 public key
 #[repr(C)]
 pub struct PublicKey([c_uchar; 64]);
@@ -125,6 +139,7 @@ impl SharedSecret {
     pub unsafe fn blank() -> SharedSecret { mem::uninitialized() }
 }
 
+
 extern "C" {
     pub static secp256k1_nonce_function_rfc6979: NonceFn;
 
@@ -140,6 +155,18 @@ extern "C" {
     pub fn secp256k1_context_randomize(cx: *mut Context,
                                        seed32: *const c_uchar)
                                        -> c_int;
+    // Scratch space
+    pub fn secp256k1_scratch_space_create(cx: *mut Context,
+                                          max_size: size_t)
+                                          -> *mut ScratchSpace;
+
+    pub fn secp256k1_scratch_space_destroy(sp: *mut ScratchSpace);
+
+    // Generator
+    pub fn secp256k1_generator_generate(cx: *const Context,
+                                        gen: *mut Generator,
+                                        seed32: *const c_uchar)
+                                        -> c_int;
 
     // TODO secp256k1_context_set_illegal_callback
     // TODO secp256k1_context_set_error_callback
@@ -346,7 +373,8 @@ extern "C" {
 		commit: *mut c_uchar,
 		blind: *const c_uchar,
 		value: uint64_t,
-		gen: *const c_uchar
+		value_gen: *const c_uchar,
+		blind_gen: *const c_uchar
 	) -> c_int;
 
 	// Takes a list of n pointers to 32 byte blinding values, the first negs
@@ -440,42 +468,62 @@ extern "C" {
 		gen: *const c_uchar
 	) -> c_int;
 
-	pub fn secp256k1_bulletproof_rangeproof_prove_single_w_scratch(
+	pub fn secp256k1_bulletproof_generators_create(
 		ctx: *const Context,
+		blinding_gen: *const c_uchar,
+		n: size_t,
+		precomp_n: size_t
+	) -> *mut BulletproofGenerators;
+
+	pub fn secp256k1_bulletproof_generators_destroy(
+		ctx: *const Context,
+		gen: *mut BulletproofGenerators,
+	);
+
+	pub fn secp256k1_bulletproof_rangeproof_prove(
+		ctx: *const Context,
+		scratch: *mut ScratchSpace,
+		gens: *const BulletproofGenerators,
 		proof: *mut c_uchar,
 		plen: *mut size_t,
-		value: uint64_t,
-		blind: *const c_uchar,
-		gen: *const c_uchar,
+		value: *const uint64_t,
+		min_value: uint64_t,
+		blind: *const *const c_uchar,
+		n_commits: size_t,
+		value_gen: *const c_uchar,
 		nbits: size_t,
 		nonce: *const c_uchar,
-		extra_commit: *const c_uchar,
-		extra_commit_len: size_t,
-		message: *const c_uchar
-	) -> c_int;
-
-	pub fn secp256k1_bulletproof_rangeproof_verify_single_w_scratch(
-		ctx: *const Context,
-		proof: *const c_uchar,
-		plen: size_t,
-		commit: *const c_uchar,
-		nbits: size_t,
-		gen: *const c_uchar,
 		extra_commit: *const c_uchar,
 		extra_commit_len: size_t
 	) -> c_int;
 
-	pub fn secp256k1_bulletproof_rangeproof_unwind_message(
+	pub fn secp256k1_bulletproof_rangeproof_verify(
 		ctx: *const Context,
+		scratch: *mut ScratchSpace,
+		gens: *const BulletproofGenerators,
 		proof: *const c_uchar,
 		plen: size_t,
+		min_value: uint64_t,
 		commit: *const c_uchar,
+		n_commits: size_t,
 		nbits: size_t,
-		gen: *const c_uchar,
+		value_gen: *const c_uchar,
 		extra_commit: *const c_uchar,
-		extra_commit_len: size_t,
-		blind: *const c_uchar,
+		extra_commit_len: size_t
+	) -> c_int;
+
+	pub fn secp256k1_bulletproof_rangeproof_rewind(
+		ctx: *const Context,
+		gens: *const BulletproofGenerators,
+		value: *mut uint64_t,
+		blind: *mut c_uchar,
+		proof: *const c_uchar,
+		plen: size_t,
+		min_value: uint64_t,
+		commit: *const c_uchar,
+		value_gen: *const c_uchar,
 		nonce: *const c_uchar,
-		message: *mut c_uchar,
+		extra_commit: *const c_uchar,
+		extra_commit_len: size_t
 	) -> c_int;
 }
