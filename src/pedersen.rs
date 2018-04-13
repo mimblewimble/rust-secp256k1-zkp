@@ -359,8 +359,8 @@ impl Secp256k1 {
 				commit.as_mut_ptr(),
 				blind.as_ptr(),
 				value,
-				constants::GENERATOR_G.as_ptr(),
 				constants::GENERATOR_H.as_ptr(),
+				constants::GENERATOR_G.as_ptr(),
 			)};
 		Ok(Commitment(commit))
 	}
@@ -381,8 +381,8 @@ impl Secp256k1 {
 				commit.as_mut_ptr(),
 				zblind.as_ptr(),
 				value,
-				constants::GENERATOR_G.as_ptr(),
 				constants::GENERATOR_H.as_ptr(),
+				constants::GENERATOR_G.as_ptr(),
 			)};
 		Ok(Commitment(commit))
 	}
@@ -685,7 +685,7 @@ impl Secp256k1 {
 				// because: "This can randomly fail with probability around one in 2^100.
 				// If this happens, buy a lottery ticket and retry."
 				let scratch = ffi::secp256k1_scratch_space_create(self.ctx, 256 * MAX_WIDTH);
-				let gens = ffi::secp256k1_bulletproof_generators_create(self.ctx, constants::GENERATOR_H.as_ptr(), 256, 1);
+				let gens = ffi::secp256k1_bulletproof_generators_create(self.ctx, constants::GENERATOR_G.as_ptr(), 256, 1);
 				let result = ffi::secp256k1_bulletproof_rangeproof_prove(
 					self.ctx,
 					scratch,
@@ -696,7 +696,7 @@ impl Secp256k1 {
 					0,
 					blind_vec.as_ptr(),
 					1,
-					constants::GENERATOR_G.as_ptr(),
+					constants::GENERATOR_H.as_ptr(),
 					n_bits as size_t,
 					nonce.as_ptr(),
 					extra_data.as_ptr(),
@@ -743,7 +743,7 @@ impl Secp256k1 {
 
 		let success = unsafe {
 			let scratch = ffi::secp256k1_scratch_space_create(self.ctx, 256 * MAX_WIDTH);
-			let gens = ffi::secp256k1_bulletproof_generators_create(self.ctx, constants::GENERATOR_H.as_ptr(), 256, 1);
+			let gens = ffi::secp256k1_bulletproof_generators_create(self.ctx, constants::GENERATOR_G.as_ptr(), 256, 1);
 			let result = ffi::secp256k1_bulletproof_rangeproof_verify(
 				self.ctx,
 				scratch,
@@ -754,7 +754,7 @@ impl Secp256k1 {
 				commit.0.as_ptr(),
 				1,
 				n_bits as size_t,
-				constants::GENERATOR_G.as_ptr(),
+				constants::GENERATOR_H.as_ptr(),
 				extra_data.as_ptr(),
 				extra_data.len() as size_t
 			 );
@@ -795,7 +795,7 @@ impl Secp256k1 {
 
 		let success = unsafe {
 			let scratch = ffi::secp256k1_scratch_space_create(self.ctx, 256 * MAX_WIDTH);
-			let gens = ffi::secp256k1_bulletproof_generators_create(self.ctx, constants::GENERATOR_H.as_ptr(), 256, 1);
+			let gens = ffi::secp256k1_bulletproof_generators_create(self.ctx, constants::GENERATOR_G.as_ptr(), 256, 1);
 			let result = ffi::secp256k1_bulletproof_rangeproof_rewind(
 				self.ctx,
 				gens,
@@ -805,7 +805,7 @@ impl Secp256k1 {
 				proof.plen as size_t,
 				0,
 				commit.as_ptr(),
-				constants::GENERATOR_G.as_ptr(),
+				constants::GENERATOR_H.as_ptr(),
 				nonce.as_ptr(),
 				extra_data.as_ptr(),
 				extra_data.len() as size_t,
