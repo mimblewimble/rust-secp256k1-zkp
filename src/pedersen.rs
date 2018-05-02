@@ -773,6 +773,57 @@ impl Secp256k1 {
 		}
 	}
 
+	/// Verify with bullet proof that a committed value is positive
+	#[deprecated(since="0.1.0", note="Experimental - underlying code unreviewed and subject to change")]
+	pub fn verify_bullet_proof_multi(
+		&self,
+		commits: Vec<Commitment>,
+		proofs: Vec<RangeProof>,
+	) -> Result<ProofRange, Error> {
+		let n_bits = 64;
+
+		let proof_size = if proofs.len()>0 {
+			proofs[0].plen
+		} else {
+			constants::SINGLE_BULLET_PROOF_SIZE
+		};
+
+		let commit_vec = map_vec!(commits, |c| c.0.as_ptr());
+		let proof_vec = map_vec!(proofs, |p| p.proof.as_ptr());
+
+		let success = unsafe {
+			let scratch = ffi::secp256k1_scratch_space_create(self.ctx, 256 * MAX_WIDTH);
+			let gens = ffi::secp256k1_bulletproof_generators_create(self.ctx, constants::GENERATOR_G.as_ptr(), 256, 1);
+			let result = ffi::secp256k1_bulletproof_rangeproof_verify_multi(
+				self.ctx,
+				scratch,
+				gens,
+				proof_vec.as_ptr(),
+				proof_vec.len(),
+				proof_size,
+				ptr::null(),
+				commit_vec.as_ptr(),
+				1,
+				n_bits as size_t,
+				constants::GENERATOR_H.as_ptr(),
+				ptr::null(),
+				0
+			 );
+			ffi::secp256k1_bulletproof_generators_destroy(self.ctx, gens);
+			ffi::secp256k1_scratch_space_destroy(scratch);
+			result == 1
+		};
+
+		if success {
+			Ok(ProofRange {
+				min: 0,
+				max: u64::MAX,
+			})
+		} else {
+			Err(Error::InvalidRangeProof)
+		}
+	}
+
 	/// Rewind a bullet proof to get the value and Blinding factor back out
 	#[deprecated(since="0.1.0", note="Experimental - underlying code unreviewed and subject to change")]
 	pub fn rewind_bullet_proof(
@@ -837,7 +888,7 @@ impl Secp256k1 {
 
 #[cfg(test)]
 mod tests {
-    use super::{Commitment, ProofMessage, Message, Secp256k1};
+    use super::{Commitment, RangeProof, ProofMessage, Message, Secp256k1};
     use ContextFlag;
     use key::{ONE_KEY, ZERO_KEY, SecretKey};
 
@@ -1116,6 +1167,33 @@ mod tests {
 		if !proof_info.is_err(){
 			panic!("Bullet proof verify with message should have errored.");
 		}
+	}
+
+	#[ignore] // going to come back to this, doesn't appear to be working for some reason
+	#[test]
+	fn test_bullet_proof_verify_multi() {
+		let mut commits:Vec<Commitment> = vec![];
+		let mut proofs:Vec<RangeProof> = vec![];
+
+		let secp = Secp256k1::with_caps(ContextFlag::Commit);
+		let blinding = SecretKey::new(&secp, &mut OsRng::new().unwrap());
+		let wrong_blinding = SecretKey::new(&secp, &mut OsRng::new().unwrap());
+		let value = 12345678;
+
+		let wrong_commit = secp.commit(value, wrong_blinding).unwrap();
+
+		commits.push(secp.commit(value, blinding).unwrap());
+		proofs.push(secp.bullet_proof(value, blinding, blinding, None));
+		let proof_range = secp.verify_bullet_proof(commits[0].clone(), proofs[0].clone(), None).unwrap();
+		assert_eq!(proof_range.min, 0);
+
+		// verify with single element in each
+		let proof_range = secp.verify_bullet_proof_multi(commits.clone(), proofs.clone()).unwrap();
+		assert_eq!(proof_range.min, 0);
 		
+		// verify wrong proof
+		commits[0] = wrong_commit.clone();
+		let proof_range = secp.verify_bullet_proof_multi(commits, proofs).unwrap();
+		assert_eq!(proof_range.min, 0);
 	}
 }
