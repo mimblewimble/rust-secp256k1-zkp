@@ -34,8 +34,6 @@ use rand::{Rng, OsRng};
 use serde::{ser, de};
 use std::ptr;
 
-const MAX_WIDTH:usize = 1 << 20;
-
 /// A Pedersen commitment
 pub struct Commitment(pub [u8; constants::PEDERSEN_COMMITMENT_SIZE]);
 impl_array_newtype!(Commitment, u8, constants::PEDERSEN_COMMITMENT_SIZE);
@@ -277,8 +275,6 @@ pub struct ProofInfo {
 	pub success: bool,
 	/// Value that was used by the commitment
 	pub value: u64,
-	/// Blinding factor that was used (Bulletproofs)
-	pub blinding: SecretKey,
 	/// Message embedded in the proof
 	pub message: ProofMessage,
 	/// Length of the embedded message (message is "padded" with garbage to fixed number of bytes)
@@ -359,7 +355,6 @@ impl Secp256k1 {
 				commit.as_mut_ptr(),
 				blind.as_ptr(),
 				value,
-				constants::GENERATOR_G.as_ptr(),
 				constants::GENERATOR_H.as_ptr(),
 			)};
 		Ok(Commitment(commit))
@@ -381,7 +376,6 @@ impl Secp256k1 {
 				commit.as_mut_ptr(),
 				zblind.as_ptr(),
 				value,
-				constants::GENERATOR_G.as_ptr(),
 				constants::GENERATOR_H.as_ptr(),
 			)};
 		Ok(Commitment(commit))
@@ -603,7 +597,6 @@ impl Secp256k1 {
 			success: success,
 			value: value,
 			message: ProofMessage::from_bytes(&message),
-			blinding: SecretKey([0;constants::SECRET_KEY_SIZE]),
 			mlen: mlen,
 			min: min,
 			max: max,
@@ -640,7 +633,6 @@ impl Secp256k1 {
 			success: success,
 			value: 0,
 			message: ProofMessage::empty(),
-			blinding: SecretKey([0;constants::SECRET_KEY_SIZE]),
 			mlen: 0,
 			min: min,
 			max: max,
@@ -659,15 +651,24 @@ impl Secp256k1 {
 		value: u64,
 		blind: SecretKey,
 		nonce: SecretKey,
-		extra_data: Option<Vec<u8>>
+		extra_data: Option<Vec<u8>>,
+		message: Option<ProofMessage>,
 	) -> RangeProof {
 		let mut retried = false;
 		let mut proof = [0; constants::MAX_PROOF_SIZE];
 		let mut plen = constants::MAX_PROOF_SIZE as size_t;
 
-		let blind_vec:Vec<SecretKey> = vec![blind];
-		let blind_vec = map_vec!(blind_vec, |p| p.0.as_ptr());
+		let blind_vec:Vec<[u8;constants::SECRET_KEY_SIZE]> = vec![blind.0];
+		let blind_vec = &blind_vec[..];
 		let n_bits = 64;
+
+		let message_ptr = match message {
+				Some(mut m) => {
+					m.truncate(constants::BULLET_PROOF_MSG_SIZE);
+					m.as_ptr()
+				},
+				None => ptr::null(),
+		};
 
 		let extra_data = match extra_data {
 				Some(d) => {
@@ -679,34 +680,23 @@ impl Secp256k1 {
 		// TODO - confirm this reworked retry logic works as expected
 		// pretty sure the original approach retried on success (so twice in total)
 		// and just kept looping forever on error
-
 		loop {
 			let success = unsafe {
 				// because: "This can randomly fail with probability around one in 2^100.
 				// If this happens, buy a lottery ticket and retry."
-				let scratch = ffi::secp256k1_scratch_space_create(self.ctx, 256 * MAX_WIDTH);
-				let gens = ffi::secp256k1_bulletproof_generators_create(self.ctx, constants::GENERATOR_H.as_ptr(), 256, 1);
-				let result = ffi::secp256k1_bulletproof_rangeproof_prove(
+				ffi::secp256k1_bulletproof_rangeproof_prove_single_w_scratch(
 					self.ctx,
-					scratch,
-					gens,
 					proof.as_mut_ptr(),
 					&mut plen,
-					&value,
-					0,
-					blind_vec.as_ptr(),
-					1,
-					constants::GENERATOR_G.as_ptr(),
+					value,
+					blind_vec[0].as_ptr(),
+					constants::GENERATOR_H.as_ptr(),
 					n_bits as size_t,
 					nonce.as_ptr(),
 					extra_data.as_ptr(),
 					extra_data.len() as size_t,
-				);
-
-				ffi::secp256k1_bulletproof_generators_destroy(self.ctx, gens);
-				ffi::secp256k1_scratch_space_destroy(scratch);
-
-				result == 1
+					message_ptr
+				) == 1
 			};
 			// break out of the loop immediately on success or
 			// or on the 2nd attempt if we retried
@@ -716,7 +706,6 @@ impl Secp256k1 {
 				retried = true;
 			}
 		}
-
 		RangeProof {
 			proof: proof,
 			plen: plen as usize,
@@ -740,27 +729,17 @@ impl Secp256k1 {
 				None => vec![],
 		};
 
-
 		let success = unsafe {
-			let scratch = ffi::secp256k1_scratch_space_create(self.ctx, 256 * MAX_WIDTH);
-			let gens = ffi::secp256k1_bulletproof_generators_create(self.ctx, constants::GENERATOR_H.as_ptr(), 256, 1);
-			let result = ffi::secp256k1_bulletproof_rangeproof_verify(
+			ffi::secp256k1_bulletproof_rangeproof_verify_single_w_scratch(
 				self.ctx,
-				scratch,
-				gens,
 				proof.proof.as_ptr(),
 				proof.plen as size_t,
-				0,
-				commit.0.as_ptr(),
-				1,
+				commit.as_ptr(),
 				n_bits as size_t,
-				constants::GENERATOR_G.as_ptr(),
+				constants::GENERATOR_H.as_ptr(),
 				extra_data.as_ptr(),
 				extra_data.len() as size_t
-			 );
-			ffi::secp256k1_bulletproof_generators_destroy(self.ctx, gens);
-			ffi::secp256k1_scratch_space_destroy(scratch);
-			result == 1
+			 ) == 1
 		};
 
 		if success {
@@ -773,15 +752,17 @@ impl Secp256k1 {
 		}
 	}
 
-	/// Rewind a bullet proof to get the value and Blinding factor back out
+	/// Unwind a bullet proof to get the message out
 	#[deprecated(since="0.1.0", note="Experimental - underlying code unreviewed and subject to change")]
-	pub fn rewind_bullet_proof(
+	pub fn unwind_bullet_proof(
 		&self,
 		commit: Commitment,
+		blind: SecretKey,
 		nonce: SecretKey,
 		extra_data: Option<Vec<u8>>,
 		proof: RangeProof
-	) -> Result<ProofInfo, Error> {
+	) -> Result<ProofMessage, Error> {
+		let n_bits = 64;
 
 		let extra_data = match extra_data {
 				Some(d) => {
@@ -790,49 +771,30 @@ impl Secp256k1 {
 				None => vec![],
 		};
 
-		let mut blind_out = [0u8; constants::SECRET_KEY_SIZE];
-		let mut value_out = 0;
+		let mut message = [0u8; 64];
 
 		let success = unsafe {
-			let scratch = ffi::secp256k1_scratch_space_create(self.ctx, 256 * MAX_WIDTH);
-			let gens = ffi::secp256k1_bulletproof_generators_create(self.ctx, constants::GENERATOR_H.as_ptr(), 256, 1);
-			let result = ffi::secp256k1_bulletproof_rangeproof_rewind(
+			ffi::secp256k1_bulletproof_rangeproof_unwind_message(
 				self.ctx,
-				gens,
-				&mut value_out,
-				blind_out.as_mut_ptr(),
 				proof.proof.as_ptr(),
 				proof.plen as size_t,
-				0,
 				commit.as_ptr(),
-				constants::GENERATOR_G.as_ptr(),
-				nonce.as_ptr(),
+				n_bits as size_t,
+				constants::GENERATOR_H.as_ptr(),
 				extra_data.as_ptr(),
 				extra_data.len() as size_t,
-			 );
-			ffi::secp256k1_bulletproof_generators_destroy(self.ctx, gens);
-			ffi::secp256k1_scratch_space_destroy(scratch);
-			result == 1
+				blind.as_ptr(),
+				nonce.as_ptr(),
+				message.as_mut_ptr(),
+			 ) == 1
 		};
 
-
 		if success {
-			Ok(ProofInfo {
-					success: true,
-					value: value_out,
-					blinding: SecretKey(blind_out),
-					message: ProofMessage::empty(),
-					mlen: 0,
-					min: 0,
-					max: u64::MAX,
-					exp: 0,
-					mantissa: 0,
-				})
+			Ok(ProofMessage::from_bytes(&message))
 		} else {
 			Err(Error::InvalidRangeProof)
 		}
 	}
-	
 }
 
 #[cfg(test)]
@@ -1050,7 +1012,7 @@ mod tests {
 		let blinding = SecretKey::new(&secp, &mut OsRng::new().unwrap());
 		let value = 12345678;
 		let commit = secp.commit(value, blinding).unwrap();
-		let bullet_proof = secp.bullet_proof(value, blinding, blinding, None);
+		let bullet_proof = secp.bullet_proof(value, blinding, blinding, None, None);
 
 		// correct verification
 		println!("Bullet proof len: {}", bullet_proof.plen);
@@ -1060,7 +1022,7 @@ mod tests {
 		// wrong value committed to
 		let value = 12345678;
 		let wrong_commit = secp.commit(87654321, blinding).unwrap();
-		let bullet_proof = secp.bullet_proof(value, blinding, blinding, None);
+		let bullet_proof = secp.bullet_proof(value, blinding, blinding, None, None);
 		if !secp.verify_bullet_proof(wrong_commit, bullet_proof, None).is_err(){
 			panic!("Bullet proof verify should have errored");
 		}
@@ -1069,7 +1031,7 @@ mod tests {
 		let value = 12345678;
 		let commit = secp.commit(value, blinding).unwrap();
 		let blinding = SecretKey::new(&secp, &mut OsRng::new().unwrap());
-		let bullet_proof = secp.bullet_proof(value, blinding, blinding, None);
+		let bullet_proof = secp.bullet_proof(value, blinding, blinding, None, None);
 		if !secp.verify_bullet_proof(commit, bullet_proof, None).is_err(){
 			panic!("Bullet proof verify should have errored");
 		}
@@ -1079,7 +1041,7 @@ mod tests {
 		let blinding = SecretKey::new(&secp, &mut OsRng::new().unwrap());
 		let value = 12345678;
 		let commit = secp.commit(value, blinding).unwrap();
-		let bullet_proof = secp.bullet_proof(value, blinding, blinding, Some(extra_data.clone()));
+		let bullet_proof = secp.bullet_proof(value, blinding, blinding, Some(extra_data.clone()), None);
 		if secp.verify_bullet_proof(commit, bullet_proof, Some(extra_data.clone())).is_err(){
 			panic!("Bullet proof verify should NOT have errored.");
 		}
@@ -1090,32 +1052,116 @@ mod tests {
 			panic!("Bullet proof verify should have errored.");
 		}
 
-		// Ensure rewinding works
+		// Ensure verification works with extra data
 
+		// Embed message into rangeproof with extra data
 		let blinding = SecretKey::new(&secp, &mut OsRng::new().unwrap());
 		let nonce = SecretKey::new(&secp, &mut OsRng::new().unwrap());
 		let value = 12345678;
 		let commit = secp.commit(value, blinding).unwrap();
-
-		let bullet_proof = secp.bullet_proof(value, blinding, nonce, Some(extra_data.clone()));
-		// Unwind message with same blinding factor
-		let proof_info = secp.rewind_bullet_proof(commit, nonce, Some(extra_data.clone()), bullet_proof).unwrap();
-		assert_eq!(proof_info.value, value);
-		assert_eq!(blinding, proof_info.blinding);
-
-		// unwinding with wrong nonce data should puke
-		let proof_info = secp.rewind_bullet_proof(commit, 
-			blinding, Some(extra_data.clone().to_vec()), bullet_proof);
-		if !proof_info.is_err(){
-			panic!("Bullet proof verify with message should have errored.");
+		let mut message = [0u8;64];
+		print!("Message: ");
+		for i in 0..message.len() {
+			message[i]=i as u8;
+			print!("{} ", message[i]);
 		}
+		println!();
+		let bullet_proof = secp.bullet_proof(value, blinding, nonce, Some(extra_data.clone()), Some(ProofMessage::from_bytes(&message)));
+		// Unwind message with same blinding factor
+		let recovered_message = secp.unwind_bullet_proof(commit, blinding, nonce, Some(extra_data.clone()), bullet_proof).unwrap();
+		let message_bytes = recovered_message.as_bytes().clone();
+		print!("Recovered message: ");
+		for i in 0..message_bytes.len() {
+			print!("{} ", message_bytes[i]);
+			assert_eq!(message[i], message_bytes[i]);
+		}
+		println!();
 
 		// unwinding with wrong extra data should puke
-		let proof_info = secp.rewind_bullet_proof(commit, 
-			nonce, None, bullet_proof);
-		if !proof_info.is_err(){
+		let recovered_message = secp.unwind_bullet_proof(commit, 
+			blinding, blinding, Some(malleated_extra_data.clone().to_vec()), bullet_proof);
+		if !recovered_message.is_err(){
 			panic!("Bullet proof verify with message should have errored.");
 		}
 		
+		// Wrong blinding but correct extra data should give us nonsense
+		let blinding = SecretKey::new(&secp, &mut OsRng::new().unwrap());
+		let recovered_message = secp.unwind_bullet_proof(commit, blinding, blinding, Some(extra_data.clone()), bullet_proof).unwrap();
+		let message_bytes = recovered_message.as_bytes().clone();
+		print!("Recovered message w/ incorrect blinding: ");
+		let mut matches = true;
+		for i in 0..message_bytes.len() {
+			if message_bytes[i] != message[i] {
+				matches = false;
+				break;
+			}
+		}
+		assert_eq!(matches, false);
+		println!();
 	}
+
+	#[test]
+	fn test_bullet_nonce_neq_blind() {
+		use std;
+		use super::*;
+		let secp = Secp256k1::with_caps(ContextFlag::Commit);
+		let mut rng = OsRng::new().unwrap();
+		let value = 1234567;
+		let blind = SecretKey::new(&secp, &mut rng);
+		let nonce = SecretKey::new(&secp, &mut rng);
+		let mut msg = [0u8; 64];
+		rng.fill_bytes(&mut msg);
+
+		// ffi structures
+		let n_bits = 64;
+		let mut proof = [0; constants::MAX_PROOF_SIZE];
+		let mut plen = constants::MAX_PROOF_SIZE as size_t;
+		let extra_data = vec![];
+
+		// create proof
+		let success = unsafe {
+			ffi::secp256k1_bulletproof_rangeproof_prove_single_w_scratch(
+				secp.ctx,
+				proof.as_mut_ptr(),
+				&mut plen,
+				value,
+				blind.as_ptr(),
+				constants::GENERATOR_H.as_ptr(),
+				n_bits as size_t,
+				nonce.as_ptr(),
+				extra_data.as_ptr(),
+				extra_data.len() as size_t,
+				msg.as_ptr()
+			) == 1
+		};
+		assert!(success);
+
+		// unwind proof
+		let mut unwinded_msg = [0u8; 64];
+		let commit = secp.commit(value, blind).unwrap();
+		let success = unsafe {
+			ffi::secp256k1_bulletproof_rangeproof_unwind_message(
+				secp.ctx,
+				proof.as_ptr(),
+				plen as size_t,
+				commit.as_ptr(),
+				n_bits as size_t,
+				constants::GENERATOR_H.as_ptr(),
+				extra_data.as_ptr(),
+				extra_data.len() as size_t,
+				blind.as_ptr(),
+				nonce.as_ptr(),
+				unwinded_msg.as_mut_ptr(),
+			) == 1
+		};
+		assert!(success);
+
+		println!("msg:     {:?}", msg.to_vec());
+		println!("unwinded:{:?}", unwinded_msg.to_vec());
+
+		for i in 0..msg.len() {
+			assert_eq!(msg[i], unwinded_msg[i]);
+		}
+	}
+
 }
