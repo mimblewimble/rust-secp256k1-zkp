@@ -669,11 +669,9 @@ impl Secp256k1 {
 		let blind_vec = map_vec!(blind_vec, |p| p.0.as_ptr());
 		let n_bits = 64;
 
-		let extra_data = match extra_data {
-				Some(d) => {
-					d
-				},
-				None => vec![],
+		let (extra_data, extra_data_len) = match extra_data {
+				Some(d) => (d.as_ptr(), d.len()),
+				None => (ptr::null(), 0),
 		};
 
 		// TODO - confirm this reworked retry logic works as expected
@@ -699,8 +697,8 @@ impl Secp256k1 {
 					constants::GENERATOR_H.as_ptr(),
 					n_bits as size_t,
 					nonce.as_ptr(),
-					extra_data.as_ptr(),
-					extra_data.len() as size_t,
+					extra_data,
+					extra_data_len as size_t,
 				);
 
 				ffi::secp256k1_bulletproof_generators_destroy(self.ctx, gens);
@@ -733,13 +731,10 @@ impl Secp256k1 {
 	) -> Result<ProofRange, Error> {
 		let n_bits = 64;
 
-		let extra_data = match extra_data {
-				Some(d) => {
-					d
-				},
-				None => vec![],
+		let (extra_data, extra_data_len) = match extra_data {
+				Some(d) => (d.as_ptr(), d.len()),
+				None => (ptr::null(), 0),
 		};
-
 
 		let success = unsafe {
 			let scratch = ffi::secp256k1_scratch_space_create(self.ctx, 256 * MAX_WIDTH);
@@ -755,8 +750,8 @@ impl Secp256k1 {
 				1,
 				n_bits as size_t,
 				constants::GENERATOR_H.as_ptr(),
-				extra_data.as_ptr(),
-				extra_data.len() as size_t
+				extra_data,
+				extra_data_len as size_t,
 			 );
 			ffi::secp256k1_bulletproof_generators_destroy(self.ctx, gens);
 			ffi::secp256k1_scratch_space_destroy(scratch);
@@ -790,6 +785,7 @@ impl Secp256k1 {
 
 		let commit_vec = map_vec!(commits, |c| c.0.as_ptr());
 		let proof_vec = map_vec!(proofs, |p| p.proof.as_ptr());
+		let min_values = vec![0; proofs.len()];
 
 		let success = unsafe {
 			let scratch = ffi::secp256k1_scratch_space_create(self.ctx, 256 * MAX_WIDTH);
@@ -801,13 +797,13 @@ impl Secp256k1 {
 				proof_vec.as_ptr(),
 				proof_vec.len(),
 				proof_size,
-				ptr::null(),
+				min_values.as_ptr(),
 				commit_vec.as_ptr(),
 				1,
 				n_bits as size_t,
 				constants::GENERATOR_H.as_ptr(),
 				ptr::null(),
-				0
+				ptr::null(),
 			 );
 			ffi::secp256k1_bulletproof_generators_destroy(self.ctx, gens);
 			ffi::secp256k1_scratch_space_destroy(scratch);
@@ -1169,7 +1165,6 @@ mod tests {
 		}
 	}
 
-	#[ignore] // going to come back to this, doesn't appear to be working for some reason
 	#[test]
 	fn test_bullet_proof_verify_multi() {
 		let mut commits:Vec<Commitment> = vec![];
@@ -1184,16 +1179,30 @@ mod tests {
 
 		commits.push(secp.commit(value, blinding).unwrap());
 		proofs.push(secp.bullet_proof(value, blinding, blinding, None));
+		println!("1");
 		let proof_range = secp.verify_bullet_proof(commits[0].clone(), proofs[0].clone(), None).unwrap();
 		assert_eq!(proof_range.min, 0);
 
 		// verify with single element in each
+		println!("2");
 		let proof_range = secp.verify_bullet_proof_multi(commits.clone(), proofs.clone()).unwrap();
 		assert_eq!(proof_range.min, 0);
 		
 		// verify wrong proof
 		commits[0] = wrong_commit.clone();
-		let proof_range = secp.verify_bullet_proof_multi(commits, proofs).unwrap();
-		assert_eq!(proof_range.min, 0);
+		println!("3");
+		if !secp.verify_bullet_proof_multi(commits.clone(), proofs.clone()).is_err() {
+			panic!("Bullet proof multy verify should have errored.");
+		}
+
+		// TODO double elements, not working
+		// commits = vec![];
+		// commits.push(secp.commit(value, blinding).unwrap());
+		// commits.push(secp.commit(value, blinding).unwrap());
+		// proofs.push(secp.bullet_proof(value, blinding, blinding, None));
+		// println!("4");
+		// let proof_range = secp.verify_bullet_proof_multi(commits.clone(), proofs.clone()).unwrap();
+		// assert_eq!(proof_range.min, 0);
+		// assert_eq!(proof_range.min, 0);
 	}
 }
