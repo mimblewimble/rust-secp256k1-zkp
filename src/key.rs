@@ -127,6 +127,26 @@ impl PublicKey {
         PublicKey(ffi::PublicKey::new())
     }
 
+    /// Creates a new public key as the sum of the provided keys
+    pub fn from_combination(secp: &Secp256k1, in_keys: Vec<&PublicKey>)
+                         -> Result<PublicKey, Error> {
+        let mut retkey = PublicKey::new();
+        if secp.caps == ContextFlag::SignOnly || secp.caps == ContextFlag::None {
+            return Err(IncapableContext);
+        }
+        let in_vec:Vec<*const ffi::PublicKey> = in_keys.iter()
+        .map(|pk| pk.as_ptr())
+        .collect();
+        unsafe {
+            if ffi::secp256k1_ec_pubkey_combine(secp.ctx, &mut retkey.0 as *mut _,
+                                                  in_vec.as_ptr(), in_vec.len() as i32) == 1 {
+                Ok(retkey)
+            } else {
+                Err(InvalidPublicKey)
+            }
+        }
+    }
+
     /// Determines whether a pubkey is valid
     #[inline]
     pub fn is_valid(&self) -> bool {
@@ -681,6 +701,21 @@ mod test {
         assert!(sk2.mul_assign(&s, &sk1).is_ok());
         assert!(pk2.mul_assign(&s, &sk1).is_ok());
         assert_eq!(PublicKey::from_secret_key(&s, &sk2).unwrap(), pk2);
+    }
+
+    #[test]
+    fn test_pk_combination() {
+        let s = Secp256k1::new();
+
+        let (sk1, mut pk1) = s.generate_keypair(&mut thread_rng()).unwrap();
+        let (sk2, mut pk2) = s.generate_keypair(&mut thread_rng()).unwrap();
+
+        let combined_pk = PublicKey::from_combination(&s, vec![&pk1,&pk2]).unwrap();
+
+        let _ = pk2.add_exp_assign(&s, &sk1);
+        let _ = pk1.add_exp_assign(&s, &sk2);
+        assert_eq!(combined_pk, pk2);
+        assert_eq!(combined_pk, pk1);
     }
 
     #[test]
