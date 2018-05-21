@@ -136,15 +136,15 @@ pub fn verify_single(secp: &Secp256k1, sig:&Signature, msg:&Message, pubnonce:Op
 /// pubnonce_total: sum of public nonces
 #[deprecated(since="0.1.0", note="underlying aggsig api still subject to review and change")]
 pub fn add_signatures_single(secp: &Secp256k1,
-  sig1:&Signature,
-  sig2:&Signature,
+  sigs:Vec<&Signature>,
   pubnonce_total:&PublicKey) -> Result<Signature, Error> {
     let mut retsig = Signature::from(ffi::Signature::new());
+    let sig_vec = map_vec!(sigs, |s| s.0.as_ptr());
     let retval = unsafe {
         ffi::secp256k1_aggsig_add_signatures_single(secp.ctx,
                                                     retsig.as_mut_ptr(),
-                                                    sig1.as_ptr(),
-                                                    sig2.as_ptr(),
+                                                    sig_vec.as_ptr(),
+                                                    sig_vec.len(),
                                                     pubnonce_total.as_ptr())
     };
     if retval == 0 {
@@ -407,8 +407,9 @@ mod tests {
             let result = verify_single(&secp, &sig2, &msg, Some(&nonce_sum), &pk2, true);
             assert!(result==true);
 
+            let sig_vec = vec![&sig1, &sig2];
             // Receiver calculates final sig
-            let final_sig = add_signatures_single(&secp, &sig1, &sig2, &nonce_sum).unwrap();
+            let final_sig = add_signatures_single(&secp, sig_vec, &nonce_sum).unwrap();
 
             // Add public keys
             let mut pk_sum = pk2.clone();
@@ -420,4 +421,3 @@ mod tests {
         }
     }
 }
-

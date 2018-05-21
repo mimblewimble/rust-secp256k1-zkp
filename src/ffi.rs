@@ -284,9 +284,9 @@ extern "C" {
                                            -> c_int;
 
     pub fn secp256k1_aggsig_add_signatures_single(cx: *const Context,
-                                                  sig: *mut Signature,
-                                                  sig1: *const Signature,
-                                                  sig2: *const Signature,
+                                                  ret_sig: *mut Signature,
+                                                  sigs: *const *const c_uchar,
+                                                  num_sigs: size_t,
                                                   pubnonce_total: *const PublicKey)
                                                       -> c_int;
     // EC
