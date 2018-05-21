@@ -377,6 +377,11 @@ extern "C" {
 		blind_gen: *const c_uchar
 	) -> c_int;
 
+	// Get the public key of a pedersen commitment
+	pub fn secp256k1_pedersen_commitment_to_pubkey(
+	    cx: *const Context, pk: *mut PublicKey,
+	    commit: *const c_uchar) -> c_int;
+
 	// Takes a list of n pointers to 32 byte blinding values, the first negs
 	// of which are treated with positive sign and the rest negative, then
 	// calculates an additional blinding value that adds to zero.

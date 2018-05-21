@@ -22,13 +22,12 @@ use std::u64;
 use libc::size_t;
 
 use ContextFlag;
-use Error;
+use Error::{self, InvalidPublicKey};
 use Secp256k1;
 
 use constants;
 use ffi;
-use key;
-use key::SecretKey;
+use key::{self, SecretKey, PublicKey};
 use super::{Message, Signature};
 use rand::{Rng, OsRng};
 use serde::{ser, de};
@@ -57,41 +56,18 @@ impl Commitment {
 		mem::uninitialized()
 	}
 
-	/// Converts a commitment into two "candidate" public keys
-	/// one of these will be valid, the other has the incorrect parity
-	/// we just don't know which is which...
-	/// once secp provides the necessary api we will no longer need this hack
-	/// grin uses the public key to verify signatures (hopefully one of these keys works)
-	pub fn to_two_pubkeys(&self, secp: &Secp256k1) -> [key::PublicKey; 2] {
-		let mut pk1 = [0; constants::COMPRESSED_PUBLIC_KEY_SIZE];
-		for i in 0..self.0.len() {
-			if i == 0 {
-				pk1[i] = 0x02;
-			} else {
-				pk1[i] = self.0[i];
-			}
-		}
-		// TODO - we should not unwrap these here, and handle errors better
-		let public_key1 = key::PublicKey::from_slice(secp, &pk1).unwrap();
-
-		let mut pk2 = [0; constants::COMPRESSED_PUBLIC_KEY_SIZE];
-		for i in 0..self.0.len() {
-			if i == 0 {
-				pk2[i] = 0x03;
-			} else {
-				pk2[i] = self.0[i];
-			}
-		}
-		let public_key2 = key::PublicKey::from_slice(secp, &pk2).unwrap();
-		[public_key1, public_key2]
-	}
-
 	/// Converts a commitment to a public key
-	/// TODO - we need an API in secp to convert commitments to public keys safely
-	/// a commitment is prefixed 08/09 and public keys are prefixed 02/03
-	/// see to_two_pubkeys() for a short term workaround
 	pub fn to_pubkey(&self, secp: &Secp256k1) -> Result<key::PublicKey, Error> {
-		key::PublicKey::from_slice(secp, &self.0)
+
+		let mut pk = unsafe { ffi::PublicKey::blank() };
+		unsafe {
+			if ffi::secp256k1_pedersen_commitment_to_pubkey(secp.ctx, &mut pk,
+															self.as_ptr()) == 1 {
+				Ok(key::PublicKey::from_secp256k1_pubkey(pk))
+			} else {
+				Err(InvalidPublicKey)
+			}
+		}
 	}
 }
 
@@ -306,29 +282,18 @@ impl ::std::fmt::Debug for RangeProof {
 }
 
 impl Secp256k1 {
-	/// *** This is a temporary work-around. ***
-	/// We do not know which of the two possible public keys from the commit to use,
-	/// so here we try both of them and succeed if either works.
-	/// This is sub-optimal in terms of performance.
-	/// I believe apoelstra has a strategy for fixing this in the secp256k1-zkp lib.
+	/// verify commitment
 	pub fn verify_from_commit(&self, msg: &Message, sig: &Signature, commit: &Commitment) -> Result<(), Error> {
 		if self.caps != ContextFlag::Commit {
 			return Err(Error::IncapableContext);
 		}
 
-		// If we knew which one we cared about here we would just use it,
-		// but for now return both so we can try them both.
-		let pubkeys = commit.to_two_pubkeys(&self);
+		let pubkey = commit.to_pubkey(&self).unwrap();
 
-		// Attempt to verify with the first public key,
-		// if verify fails try the other one.
-		// The first will fail on average 50% of the time.
-		let result = self.verify(msg, sig, &pubkeys[0]);
+		let result = self.verify(msg, sig, &pubkey);
 		match result {
 			Ok(x) => Ok(x),
-			Err(_) => {
-				self.verify(msg, sig, &pubkeys[1])
-			}
+			Err(_) => result
 		}
 	}
 
@@ -977,14 +942,6 @@ mod tests {
     }
 
 	#[test]
-	fn test_to_two_pubkeys() {
-		let secp = Secp256k1::with_caps(ContextFlag::Commit);
-		let blinding = SecretKey::new(&secp, &mut OsRng::new().unwrap());
-		let commit = secp.commit(5, blinding).unwrap();
-		assert_eq!(commit.to_two_pubkeys(&secp).len(), 2);
-	}
-
-	#[test]
 	// to_pubkey() is not currently working as secp does currently
 	// provide an api to extract a public key from a commitment
 	fn test_to_pubkey() {
@@ -993,8 +950,12 @@ mod tests {
 		let commit = secp.commit(5, blinding).unwrap();
 		let pubkey = commit.to_pubkey(&secp);
 		match pubkey {
-			Ok(_) => panic!("expected this to return an error"),
-			Err(_) => {}
+			Ok(_) => {
+				// this is good
+			},
+			Err(_) => {
+				panic!("this is not good");
+			}
 		}
 	}
 
@@ -1010,13 +971,11 @@ mod tests {
 
 		let sig = secp.sign(&msg, &blinding).unwrap();
 
-		let pubkeys = commit.to_two_pubkeys(&secp);
+		let pubkey = commit.to_pubkey(&secp).unwrap();
 
-		// check that we can successfully verify the signature with one of the public keys
-		if let Ok(_) = secp.verify(&msg, &sig, &pubkeys[0]) {
+		// check that we can successfully verify the signature with the public key
+		if let Ok(_) = secp.verify(&msg, &sig, &pubkey) {
 			// this is good
-		} else if let Ok(_) = secp.verify(&msg, &sig, &pubkeys[1]) {
-			// this is also good
 		} else {
 			panic!("this is not good");
 		}
