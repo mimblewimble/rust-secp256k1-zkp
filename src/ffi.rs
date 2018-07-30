@@ -420,10 +420,7 @@ extern "C" {
 		min_value: *mut uint64_t,
 		max_value: *mut uint64_t,
 		proof: *const c_uchar,
-		plen: size_t,
-		extra_commit: *const c_uchar,
-		extra_commit_len: size_t,
-		gen: *const c_uchar
+		plen: size_t
 	) -> c_int;
 
 	pub fn secp256k1_rangeproof_rewind(
