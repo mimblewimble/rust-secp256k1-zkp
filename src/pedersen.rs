@@ -19,6 +19,7 @@ use std::cmp::min;
 use std::fmt;
 use std::mem;
 use std::u64;
+use std::ptr;
 use libc::size_t;
 
 use ContextFlag;
@@ -631,9 +632,9 @@ impl Secp256k1 {
 		let blind_vec = map_vec!(blind_vec, |p| p.0.as_ptr());
 		let n_bits = 64;
 
-		let (extra_data_len, extra_data) = match extra_data {
-				Some(d) => (d.len(), d),
-				None => (0, vec![]),
+		let (extra_data_len, extra_data_ptr) = match extra_data {
+				Some(d) => (d.len(), d.as_ptr()),
+				None => (0, ptr::null()),
 		};
 
 		let _success = unsafe {
@@ -646,13 +647,13 @@ impl Secp256k1 {
 				proof.as_mut_ptr(),
 				&mut plen,
 				&value,
-				0,
+				ptr::null(),	// min_values: NULL for all-zeroes minimum values to prove ranges above
 				blind_vec.as_ptr(),
 				1,
 				constants::GENERATOR_H.as_ptr(),
 				n_bits as size_t,
 				nonce.as_ptr(),
-				extra_data.as_ptr(),
+				extra_data_ptr,
 				extra_data_len as size_t,
 			);
 
@@ -677,9 +678,9 @@ impl Secp256k1 {
 	) -> Result<ProofRange, Error> {
 		let n_bits = 64;
 
-		let (extra_data_len, extra_data) = match extra_data {
-				Some(d) => (d.len(), d),
-				None => (0, vec![]),
+		let (extra_data_len, extra_data_ptr) = match extra_data {
+				Some(d) => (d.len(), d.as_ptr()),
+				None => (0, ptr::null()),
 		};
 
 		let success = unsafe {
@@ -691,12 +692,12 @@ impl Secp256k1 {
 				gens,
 				proof.proof.as_ptr(),
 				proof.plen as size_t,
-				0,
+				ptr::null(),	// min_values: NULL for all-zeroes minimum values to prove ranges above
 				commit.0.as_ptr(),
 				1,
 				n_bits as size_t,
 				constants::GENERATOR_H.as_ptr(),
-				extra_data.as_ptr(),
+				extra_data_ptr,
 				extra_data_len as size_t,
 			 );
 			ffi::secp256k1_bulletproof_generators_destroy(self.ctx, gens);
@@ -731,18 +732,33 @@ impl Secp256k1 {
 
 		let commit_vec = map_vec!(commits, |c| c.0.as_ptr());
 		let proof_vec = map_vec!(proofs, |p| p.proof.as_ptr());
-		let min_values = vec![0; proofs.len()];
+//		let min_values = vec![0; proofs.len()];
+
+		// array of generator multiplied by value in pedersen commitments (cannot be NULL)
+		let value_gen_vec_ptr = {
+			let min_len = if proof_vec.len() > 0 {
+				proof_vec.len()
+			}else{
+				1
+			};
+			let gen_size = constants::PEDERSEN_COMMITMENT_SIZE;
+			let mut value_gen_vec = vec![0; min_len * gen_size];
+			for i in 0..min_len {
+				value_gen_vec[i * gen_size..(i + 1) * gen_size]
+					.clone_from_slice(&constants::GENERATOR_H[..]);
+			}
+			value_gen_vec.as_ptr()
+		};
 
 		// converting vec of vecs to expected pointer
-		let (extra_data_vec, extra_data_lengths) = {
+		let (extra_data_vec_ptr, extra_data_lengths_ptr) = {
 			if extra_data_in.is_some() {
 				let ed = extra_data_in.unwrap();
 				let extra_data_vec = map_vec!(ed, |d| d.as_ptr());
-				(extra_data_vec, vec![ed.len()])
+				let extra_data_lengths = map_vec![ed, |d| d.len()];
+				(extra_data_vec.as_ptr(), extra_data_lengths.as_ptr())
 			} else {
-				let extra_data:Vec<u8> = vec![];
-				let extra_data_vec = vec![extra_data.as_ptr()];
-				(extra_data_vec, vec![0])
+				(ptr::null(), ptr::null())
 			}
 		};
 
@@ -756,13 +772,13 @@ impl Secp256k1 {
 				proof_vec.as_ptr(),
 				proof_vec.len(),
 				proof_size,
-				min_values.as_ptr(),
+				ptr::null(),	// min_values: NULL for all-zeroes minimum values to prove ranges above
 				commit_vec.as_ptr(),
 				1,
 				n_bits as size_t,
-				constants::GENERATOR_H.as_ptr(),
-				extra_data_vec.as_ptr(),
-				extra_data_lengths.as_ptr(),
+				value_gen_vec_ptr,
+				extra_data_vec_ptr,
+				extra_data_lengths_ptr,
 			 );
 			ffi::secp256k1_bulletproof_generators_destroy(self.ctx, gens);
 			ffi::secp256k1_scratch_space_destroy(scratch);
@@ -1145,17 +1161,52 @@ mod tests {
 		commits[0] = wrong_commit.clone();
 		println!("3");
 		if !secp.verify_bullet_proof_multi(commits.clone(), proofs.clone(), None).is_err() {
-			panic!("Bullet proof multy verify should have errored.");
+			panic!("Bullet proof multi verify should have errored.");
 		}
 
-	// TODO double elements, not working
-	// commits = vec![];
-	// commits.push(secp.commit(value, blinding).unwrap());
-	// commits.push(secp.commit(value, blinding).unwrap());
-	// proofs.push(secp.bullet_proof(value, blinding, blinding, None));
-	// kprintln!("4");
-	// let proof_range = secp.verify_bullet_proof_multi(commits.clone(), proofs.clone()).unwrap();
-	// assert_eq!(proof_range.min, 0);
-	// assert_eq!(proof_range.min, 0);
+		//  batching verification on double elements w/t extra message data
+		commits = vec![];
+		proofs = vec![];
+		commits.push(secp.commit(value+1, blinding).unwrap());
+		commits.push(secp.commit(value-1, blinding).unwrap());
+		proofs.push(secp.bullet_proof(value+1, blinding, blinding, None));
+		proofs.push(secp.bullet_proof(value-1, blinding, blinding, None));
+		println!("4");
+		let proof_range = secp.verify_bullet_proof_multi(commits.clone(), proofs.clone(), None).unwrap();
+		assert_eq!(proof_range.min, 0);
+
+		//  batching verification on double elements w/ extra message data
+		let mut extra_data1 = [0u8;64].to_vec(); extra_data1[0]=100;
+		let mut extra_data2 = [0u8;64].to_vec(); extra_data2[0]=200;
+
+		proofs = vec![];
+		proofs.push(secp.bullet_proof(value+1, blinding, blinding, Some(extra_data1.clone())));
+		proofs.push(secp.bullet_proof(value-1, blinding, blinding, Some(extra_data2.clone())));
+
+		let mut extra_data = vec![];
+		extra_data.push(extra_data1.clone());
+		extra_data.push(extra_data2.clone());
+		println!("5");
+		let proof_range = secp.verify_bullet_proof_multi(
+			commits.clone(),
+			proofs.clone(),
+			Some(extra_data.clone()))
+			.unwrap();
+		assert_eq!(proof_range.min, 0);
+
+		// verify wrong extra message
+		let mut extra_data = vec![];
+		extra_data1[0]=101;				// simulate a wrong extra message
+		extra_data.push(extra_data1.clone());
+		extra_data.push(extra_data2.clone());
+		println!("6");
+		if !secp.verify_bullet_proof_multi(
+			commits.clone(),
+			proofs.clone(),
+			Some(extra_data.clone()))
+			.is_err() {
+			panic!("Bullet proof multi verify should have error.");
+		}
+
 	}
 }
