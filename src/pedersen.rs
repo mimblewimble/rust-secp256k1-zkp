@@ -32,7 +32,6 @@ use key::{self, SecretKey, PublicKey};
 use super::{Message, Signature};
 use rand::{Rng, OsRng};
 use serde::{ser, de};
-use std::ptr;
 
 const MAX_WIDTH:usize = 1 << 20;
 const SCRATCH_SPACE_SIZE: size_t = 256 * MAX_WIDTH;
