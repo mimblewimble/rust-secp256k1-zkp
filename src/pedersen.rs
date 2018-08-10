@@ -27,11 +27,10 @@ use Secp256k1;
 
 use constants;
 use ffi;
-use key::{self, SecretKey, PublicKey};
+use key::{self, SecretKey};
 use super::{Message, Signature};
 use rand::{Rng, OsRng};
 use serde::{ser, de};
-use std::ptr;
 
 const MAX_WIDTH:usize = 1 << 20;
 

@@ -285,7 +285,6 @@ impl Drop for AggSigContext {
 mod tests {
     use ContextFlag;
     use {Message, AggSigPartialSignature};
-    use ffi;
     use super::{AggSigContext, Secp256k1, sign_single, verify_single, export_secnonce_single, add_signatures_single};
     use rand::{Rng, thread_rng};
     use key::{SecretKey, PublicKey};
@@ -381,7 +380,7 @@ mod tests {
             let secnonce_2 = export_secnonce_single(&secp).unwrap();
 
             // Calculate public nonces
-            let pubnonce_1 = PublicKey::from_secret_key(&secp, &secnonce_1).unwrap();
+            let _pubnonce_1 = PublicKey::from_secret_key(&secp, &secnonce_1).unwrap();
             let pubnonce_2 = PublicKey::from_secret_key(&secp, &secnonce_2).unwrap();
 
             // And get the total
