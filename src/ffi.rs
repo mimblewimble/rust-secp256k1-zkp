@@ -470,7 +470,23 @@ extern "C" {
 		extra_commit_len: size_t
 	) -> c_int;
 
-	pub fn secp256k1_bulletproof_rangeproof_unwind_message(
+	pub fn secp256k1_bulletproof_rangeproof_verify_multi(
+		ctx: *const Context,
+		scratch: *mut ScratchSpace,
+		gens: *const BulletproofGenerators,
+		proofs: *const *const c_uchar,
+		n_proofs: size_t,
+		plen: size_t,
+		min_values: *const uint64_t,
+		commits: *const *const c_uchar,
+		n_commits: size_t,
+		nbits: size_t,
+		value_gen: *const c_uchar,
+		extra_commit: *const *const c_uchar,
+		extra_commit_len: *const size_t
+	) -> c_int;
+
+	pub fn secp256k1_bulletproof_rangeproof_rewind(
 		ctx: *const Context,
 		proof: *const c_uchar,
 		plen: size_t,
