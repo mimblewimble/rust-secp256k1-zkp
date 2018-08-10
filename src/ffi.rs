@@ -477,7 +477,6 @@ extern "C" {
 		ctx: *const Context,
 		blinding_gen: *const c_uchar,
 		n: size_t,
-		precomp_n: size_t
 	) -> *mut BulletproofGenerators;
 
 	pub fn secp256k1_bulletproof_generators_destroy(

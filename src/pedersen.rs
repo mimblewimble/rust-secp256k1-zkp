@@ -649,7 +649,7 @@ impl Secp256k1 {
 				if let Some(shared_gens) = SHARED_BULLETGENERATORS {
 					gens = shared_gens;
 				} else {
-					gens = ffi::secp256k1_bulletproof_generators_create(self.ctx, constants::GENERATOR_G.as_ptr(), MAX_GENERATORS, 1);
+					gens = ffi::secp256k1_bulletproof_generators_create(self.ctx, constants::GENERATOR_G.as_ptr(), MAX_GENERATORS);
 					SHARED_BULLETGENERATORS = Some(gens);
 				}
 			}
@@ -704,7 +704,7 @@ impl Secp256k1 {
 				if let Some(shared_gens) = SHARED_BULLETGENERATORS {
 					gens = shared_gens;
 				} else {
-					gens = ffi::secp256k1_bulletproof_generators_create(self.ctx, constants::GENERATOR_G.as_ptr(), MAX_GENERATORS, 1);
+					gens = ffi::secp256k1_bulletproof_generators_create(self.ctx, constants::GENERATOR_G.as_ptr(), MAX_GENERATORS);
 					SHARED_BULLETGENERATORS = Some(gens);
 				}
 			}
@@ -792,7 +792,7 @@ impl Secp256k1 {
 				if let Some(shared_gens) = SHARED_BULLETGENERATORS {
 					gens = shared_gens;
 				} else {
-					gens = ffi::secp256k1_bulletproof_generators_create(self.ctx, constants::GENERATOR_G.as_ptr(), MAX_GENERATORS, 1);
+					gens = ffi::secp256k1_bulletproof_generators_create(self.ctx, constants::GENERATOR_G.as_ptr(), MAX_GENERATORS);
 					SHARED_BULLETGENERATORS = Some(gens);
 				}
 			}
@@ -852,7 +852,7 @@ impl Secp256k1 {
 				if let Some(shared_gens) = SHARED_BULLETGENERATORS {
 					gens = shared_gens;
 				} else {
-					gens = ffi::secp256k1_bulletproof_generators_create(self.ctx, constants::GENERATOR_G.as_ptr(), MAX_GENERATORS, 1);
+					gens = ffi::secp256k1_bulletproof_generators_create(self.ctx, constants::GENERATOR_G.as_ptr(), MAX_GENERATORS);
 					SHARED_BULLETGENERATORS = Some(gens);
 				}
 			}
