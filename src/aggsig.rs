@@ -380,7 +380,7 @@ mod tests {
             let secnonce_2 = export_secnonce_single(&secp).unwrap();
 
             // Calculate public nonces
-            let _pubnonce_1 = PublicKey::from_secret_key(&secp, &secnonce_1).unwrap();
+            let _ = PublicKey::from_secret_key(&secp, &secnonce_1).unwrap();
             let pubnonce_2 = PublicKey::from_secret_key(&secp, &secnonce_2).unwrap();
 
             // And get the total
