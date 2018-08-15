@@ -620,7 +620,7 @@ impl Secp256k1 {
 
 		let (extra_data_len, extra_data_ptr) = match extra_data {
 				Some(d) => (d.len(), d.as_ptr()),
-				None => (0, ptr::null()),
+				None => (0, vec![].as_ptr()),
 		};
 
 		let _success = unsafe {
@@ -675,7 +675,7 @@ impl Secp256k1 {
 
 		let (extra_data_len, extra_data_ptr) = match extra_data {
 				Some(d) => (d.len(), d.as_ptr()),
-				None => (0, ptr::null()),
+				None => (0, vec![].as_ptr()),
 		};
 
 		let success = unsafe {
@@ -762,7 +762,9 @@ impl Secp256k1 {
 				let extra_data_lengths = map_vec![ed, |d| d.len()];
 				(extra_data_vec.as_ptr(), extra_data_lengths.as_ptr())
 			} else {
-				(ptr::null(), ptr::null())
+				let extra_data_vec = vec![vec![].as_ptr(); proof_vec.len()];
+				let extra_data_lengths = vec![0; proof_vec.len()];
+				(extra_data_vec.as_ptr(), extra_data_lengths.as_ptr())
 			}
 		};
 
