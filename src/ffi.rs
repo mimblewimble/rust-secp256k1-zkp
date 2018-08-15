@@ -466,7 +466,6 @@ extern "C" {
 		ctx: *const Context,
 		blinding_gen: *const c_uchar,
 		n: size_t,
-		precomp_n: size_t
 	) -> *mut BulletproofGenerators;
 
 	pub fn secp256k1_bulletproof_generators_destroy(
@@ -481,7 +480,7 @@ extern "C" {
 		proof: *mut c_uchar,
 		plen: *mut size_t,
 		value: *const uint64_t,
-		min_value: uint64_t,
+		min_value: *const uint64_t,
 		blind: *const *const c_uchar,
 		n_commits: size_t,
 		value_gen: *const c_uchar,
@@ -497,7 +496,7 @@ extern "C" {
 		gens: *const BulletproofGenerators,
 		proof: *const c_uchar,
 		plen: size_t,
-		min_value: uint64_t,
+		min_value: *const uint64_t,
 		commit: *const c_uchar,
 		n_commits: size_t,
 		nbits: size_t,
@@ -513,7 +512,7 @@ extern "C" {
 		proofs: *const *const c_uchar,
 		n_proofs: size_t,
 		plen: size_t,
-		min_values: *const uint64_t,
+		min_value: *const *const uint64_t,
 		commits: *const *const c_uchar,
 		n_commits: size_t,
 		nbits: size_t,
