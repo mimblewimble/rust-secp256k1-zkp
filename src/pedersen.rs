@@ -571,8 +571,6 @@ impl Secp256k1 {
 		let mut min: u64 = 0;
 		let mut max: u64 = 0;
 
-		let extra_commit = [0u8; 33];
-
 		let success = unsafe {
 			ffi::secp256k1_rangeproof_info(
 				self.ctx,
@@ -582,9 +580,6 @@ impl Secp256k1 {
 				&mut max,
 				proof.proof.as_ptr(),
 				proof.plen as size_t,
-				extra_commit.as_ptr(),
-				0 as size_t,
-				constants::GENERATOR_H.as_ptr(),
 			) == 1
 		};
 		ProofInfo {
