@@ -40,6 +40,19 @@ const MAX_GENERATORS: size_t = 256;
 /// Shared Bullet Proof Generators (avoid recreating every time)
 static mut SHARED_BULLETGENERATORS: Option<*mut ffi::BulletproofGenerators> = None;
 
+// TODO: Check whether this matters if this is used with a different context; don't think it does
+fn shared_generators(ctx: *mut ffi::Context) -> *mut ffi::BulletproofGenerators {
+	unsafe {
+		match SHARED_BULLETGENERATORS.clone() {
+			Some(s) => s,
+			None => {
+				SHARED_BULLETGENERATORS = Some(ffi::secp256k1_bulletproof_generators_create(ctx, constants::GENERATOR_G.as_ptr(), MAX_GENERATORS));
+				SHARED_BULLETGENERATORS.unwrap()
+			}
+		}
+	}
+}
+
 /// A Pedersen commitment
 pub struct Commitment(pub [u8; constants::PEDERSEN_COMMITMENT_SIZE]);
 impl_array_newtype!(Commitment, u8, constants::PEDERSEN_COMMITMENT_SIZE);
@@ -625,20 +638,10 @@ impl Secp256k1 {
 
 		let _success = unsafe {
 			let scratch = ffi::secp256k1_scratch_space_create(self.ctx, SCRATCH_SPACE_SIZE);
-			let gens;
-			{
-				if let Some(shared_gens) = SHARED_BULLETGENERATORS {
-					gens = shared_gens;
-				} else {
-					gens = ffi::secp256k1_bulletproof_generators_create(self.ctx, constants::GENERATOR_G.as_ptr(), MAX_GENERATORS);
-					SHARED_BULLETGENERATORS = Some(gens);
-				}
-			}
-
 			let result = ffi::secp256k1_bulletproof_rangeproof_prove(
 				self.ctx,
 				scratch,
-				gens,
+				shared_generators(self.ctx),
 				proof.as_mut_ptr(),
 				&mut plen,
 				&value,
@@ -680,20 +683,10 @@ impl Secp256k1 {
 
 		let success = unsafe {
 			let scratch = ffi::secp256k1_scratch_space_create(self.ctx, SCRATCH_SPACE_SIZE);
-			let gens;
-			{
-				if let Some(shared_gens) = SHARED_BULLETGENERATORS {
-					gens = shared_gens;
-				} else {
-					gens = ffi::secp256k1_bulletproof_generators_create(self.ctx, constants::GENERATOR_G.as_ptr(), MAX_GENERATORS);
-					SHARED_BULLETGENERATORS = Some(gens);
-				}
-			}
-
 			let result = ffi::secp256k1_bulletproof_rangeproof_verify(
 				self.ctx,
 				scratch,
-				gens,
+				shared_generators(self.ctx),
 				proof.proof.as_ptr(),
 				proof.plen as size_t,
 				ptr::null(),	// min_values: NULL for all-zeroes minimum values to prove ranges above
@@ -770,19 +763,10 @@ impl Secp256k1 {
 
 		let success = unsafe {
 			let scratch = ffi::secp256k1_scratch_space_create(self.ctx, SCRATCH_SPACE_SIZE);
-			let gens;
-			{
-				if let Some(shared_gens) = SHARED_BULLETGENERATORS {
-					gens = shared_gens;
-				} else {
-					gens = ffi::secp256k1_bulletproof_generators_create(self.ctx, constants::GENERATOR_G.as_ptr(), MAX_GENERATORS);
-					SHARED_BULLETGENERATORS = Some(gens);
-				}
-			}
 			let result = ffi::secp256k1_bulletproof_rangeproof_verify_multi(
 				self.ctx,
 				scratch,
-				gens,
+				shared_generators(self.ctx),
 				proof_vec.as_ptr(),
 				proof_vec.len(),
 				proof_size,
@@ -830,18 +814,9 @@ impl Secp256k1 {
 
 		let success = unsafe {
 			let scratch = ffi::secp256k1_scratch_space_create(self.ctx, SCRATCH_SPACE_SIZE);
-			let gens;
-			{
-				if let Some(shared_gens) = SHARED_BULLETGENERATORS {
-					gens = shared_gens;
-				} else {
-					gens = ffi::secp256k1_bulletproof_generators_create(self.ctx, constants::GENERATOR_G.as_ptr(), MAX_GENERATORS);
-					SHARED_BULLETGENERATORS = Some(gens);
-				}
-			}
 			let result = ffi::secp256k1_bulletproof_rangeproof_rewind(
 				self.ctx,
-				gens,
+				shared_generators(self.ctx),
 				&mut value_out,
 				blind_out.as_mut_ptr(),
 				proof.proof.as_ptr(),
