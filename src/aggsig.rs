@@ -29,7 +29,6 @@ use std::ptr;
 /// In: 
 /// msg: the message to sign
 /// seckey: the secret key
-#[deprecated(since="0.1.0", note="underlying aggsig api still subject to review and change")]
 pub fn export_secnonce_single(secp: &Secp256k1) ->
                        Result<SecretKey, Error> {
     let mut return_key = SecretKey::new(&secp, &mut OsRng::new().unwrap());
@@ -54,7 +53,7 @@ pub fn export_secnonce_single(secp: &Secp256k1) ->
 /// secnonce: if Some(SecretKey), the secret nonce to use. If None, generate a nonce
 /// pubnonce: if Some(PublicKey), overrides the public nonce to encode as part of e
 /// final_nonce_sum: if Some(PublicKey), overrides the public nonce to encode as part of e
-#[deprecated(since="0.1.0", note="underlying aggsig api still subject to review and change")]
+#[deprecated(since="0.1.0", note="All aggsig-related api functions need review and are subject to change.")]
 pub fn sign_single(secp: &Secp256k1, msg:&Message, seckey:&SecretKey, secnonce:Option<&SecretKey>, pubnonce:Option<&PublicKey>, final_nonce_sum:Option<&PublicKey> ) ->
                     Result<Signature, Error> {
     let mut retsig = Signature::from(ffi::Signature::new());
@@ -100,7 +99,6 @@ pub fn sign_single(secp: &Secp256k1, msg:&Message, seckey:&SecretKey, secnonce:O
 /// pubnonce: if Some(PublicKey) overrides the public nonce used to calculate e
 /// pubkey: the public key
 /// is_partial: whether this is a partial sig, or a fully-combined sig
-#[deprecated(since="0.1.0", note="underlying aggsig api still subject to review and change")]
 pub fn verify_single(secp: &Secp256k1, sig:&Signature, msg:&Message, pubnonce:Option<&PublicKey>, pubkey:&PublicKey, is_partial: bool) ->
                      bool {
     let pubnonce = match pubnonce {
@@ -134,7 +132,6 @@ pub fn verify_single(secp: &Secp256k1, sig:&Signature, msg:&Message, pubnonce:Op
 /// sig1: sig1 to add
 /// sig2: sig2 to add
 /// pubnonce_total: sum of public nonces
-#[deprecated(since="0.1.0", note="underlying aggsig api still subject to review and change")]
 pub fn add_signatures_single(secp: &Secp256k1,
   sigs:Vec<&Signature>,
   pubnonce_total:&PublicKey) -> Result<Signature, Error> {
@@ -163,7 +160,6 @@ pub struct AggSigContext {
 
 impl AggSigContext {
     /// Creates new aggsig context with a new random seed
-    #[deprecated(since="0.1.0", note="underlying aggsig api still subject to review and change")]
     pub fn new(secp: &Secp256k1, pubkeys: &Vec<PublicKey>) -> AggSigContext {
         let mut seed = [0; 32];
         thread_rng().fill_bytes(&mut seed);
@@ -186,7 +182,6 @@ impl AggSigContext {
     /// Returns: true on success
     ///          false if a nonce has already been generated for this index
     /// In: index: which signature to generate a nonce for
-    #[deprecated(since="0.1.0", note="underlying aggsig api still subject to review and change")]
     pub fn generate_nonce(&self, index: usize) -> bool {
         let retval = unsafe {
             ffi::secp256k1_aggsig_generate_nonce(self.ctx, self.aggsig_ctx, index)
@@ -204,7 +199,6 @@ impl AggSigContext {
     /// msg: the message to sign
     /// seckey: the secret key
     /// index: which index to generate a partial sig for
-    #[deprecated(since="0.1.0", note="underlying aggsig api still subject to review and change")]
     pub fn partial_sign(&self, msg:Message, seckey:SecretKey, index: usize) ->
                         Result<AggSigPartialSignature, Error> {
         let mut retsig = AggSigPartialSignature::from(ffi::AggSigPartialSignature::new());
@@ -226,7 +220,6 @@ impl AggSigContext {
     /// Returns: Ok(Signature) on success
     /// In: 
     /// partial_sigs: vector of partial signatures
-    #[deprecated(since="0.1.0", note="underlying aggsig api still subject to review and change")]
     pub fn combine_signatures(&self, partial_sigs: &Vec<AggSigPartialSignature>) ->
                         Result<Signature, Error> {
         let mut retsig = Signature::from(ffi::Signature::new());
@@ -253,7 +246,6 @@ impl AggSigContext {
     /// msg: message to verify
     /// sig: combined signature
     /// pks: public keys
-    #[deprecated(since="0.1.0", note="underlying aggsig api still subject to review and change")]
     pub fn verify(&self, sig: Signature, msg:Message, pks:&Vec<PublicKey>) -> bool {
         let pks:Vec<*const ffi::PublicKey> = pks.into_iter()
             .map(|p| p.as_ptr())
