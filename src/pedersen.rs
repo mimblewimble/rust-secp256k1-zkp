@@ -1205,5 +1205,21 @@ mod tests {
 			panic!("Bullet proof multi verify should have error.");
 		}
 
+		//  batching verification on 1-100 elements w/o extra message data
+		println!("7");
+		commits = vec![];
+		proofs = vec![];
+		let mut errs = 0;
+		for i in 1..100 {
+			print!("\r\r\r{}", i);
+			commits.push(secp.commit(value+i as u64, blinding).unwrap());
+			proofs.push(secp.bullet_proof(value+i as u64, blinding, blinding, None));
+			let proof_range = secp.verify_bullet_proof_multi(commits.clone(), proofs.clone(), None);//.unwrap();
+			if proof_range.is_err() {
+				println!(" proofs batch verify failed");
+				errs += 1;
+			}
+		}
+		assert_eq!(errs, 0);
 	}
 }
