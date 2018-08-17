@@ -631,9 +631,9 @@ impl Secp256k1 {
 		let blind_vec = map_vec!(blind_vec, |p| p.0.as_ptr());
 		let n_bits = 64;
 
-		let (extra_data_len, extra_data_ptr) = match extra_data {
-				Some(d) => (d.len(), d.as_ptr()),
-				None => (0, vec![].as_ptr()),
+		let (extra_data_len, extra_data) = match extra_data {
+				Some(d) => (d.len(), d),
+				None => (0, vec![]),
 		};
 
 		let _success = unsafe {
@@ -651,7 +651,7 @@ impl Secp256k1 {
 				constants::GENERATOR_H.as_ptr(),
 				n_bits as size_t,
 				nonce.as_ptr(),
-				extra_data_ptr,
+				extra_data.as_ptr(),
 				extra_data_len as size_t,
 			);
 
@@ -676,9 +676,9 @@ impl Secp256k1 {
 	) -> Result<ProofRange, Error> {
 		let n_bits = 64;
 
-		let (extra_data_len, extra_data_ptr) = match extra_data {
-				Some(d) => (d.len(), d.as_ptr()),
-				None => (0, vec![].as_ptr()),
+		let (extra_data_len, extra_data) = match extra_data {
+				Some(d) => (d.len(), d),
+				None => (0, vec![]),
 		};
 
 		let success = unsafe {
@@ -694,7 +694,7 @@ impl Secp256k1 {
 				1,
 				n_bits as size_t,
 				constants::GENERATOR_H.as_ptr(),
-				extra_data_ptr,
+				extra_data.as_ptr(),
 				extra_data_len as size_t,
 			 );
 //			ffi::secp256k1_bulletproof_generators_destroy(self.ctx, gens);
@@ -732,7 +732,7 @@ impl Secp256k1 {
 //		let min_values = vec![0; proofs.len()];
 
 		// array of generator multiplied by value in pedersen commitments (cannot be NULL)
-		let value_gen_vec_ptr = {
+		let value_gen_vec = {
 			let min_len = if proof_vec.len() > 0 {
 				proof_vec.len()
 			}else{
@@ -744,20 +744,20 @@ impl Secp256k1 {
 				value_gen_vec[i * gen_size..(i + 1) * gen_size]
 					.clone_from_slice(&constants::GENERATOR_H[..]);
 			}
-			value_gen_vec.as_ptr()
+			value_gen_vec
 		};
 
 		// converting vec of vecs to expected pointer
-		let (extra_data_vec_ptr, extra_data_lengths_ptr) = {
+		let (extra_data_vec, extra_data_lengths) = {
 			if extra_data_in.is_some() {
 				let ed = extra_data_in.unwrap();
 				let extra_data_vec = map_vec!(ed, |d| d.as_ptr());
 				let extra_data_lengths = map_vec![ed, |d| d.len()];
-				(extra_data_vec.as_ptr(), extra_data_lengths.as_ptr())
+				(extra_data_vec, extra_data_lengths)
 			} else {
 				let extra_data_vec = vec![vec![].as_ptr(); proof_vec.len()];
 				let extra_data_lengths = vec![0; proof_vec.len()];
-				(extra_data_vec.as_ptr(), extra_data_lengths.as_ptr())
+				(extra_data_vec, extra_data_lengths)
 			}
 		};
 
@@ -774,9 +774,9 @@ impl Secp256k1 {
 				commit_vec.as_ptr(),
 				1,
 				n_bits as size_t,
-				value_gen_vec_ptr,
-				extra_data_vec_ptr,
-				extra_data_lengths_ptr,
+				value_gen_vec.as_ptr(),
+				extra_data_vec.as_ptr(),
+				extra_data_lengths.as_ptr(),
 			 );
 //			ffi::secp256k1_bulletproof_generators_destroy(self.ctx, gens);
 			ffi::secp256k1_scratch_space_destroy(scratch);
