@@ -1142,14 +1142,14 @@ mod tests {
 		let blinding = SecretKey::new(&secp, &mut OsRng::new().unwrap());
 		let value = 12345678;
 
-		let increments = vec![1,5,10,100,200];
+		let increments = vec![1,2,5,10,100,200];
 
 		for v in increments {
 			let mut commits:Vec<Commitment> = vec![];
 			let mut proofs:Vec<RangeProof> = vec![];
-			for _ in 0..v {
-				commits.push(secp.commit(value, blinding).unwrap());
-				proofs.push(secp.bullet_proof(value, blinding, blinding, None));
+			for i in 0..v {
+				commits.push(secp.commit(value+i as u64, blinding).unwrap());
+				proofs.push(secp.bullet_proof(value+i as u64, blinding, blinding, None));
 			}
 			println!("--------");
 			println!("Comparing {} Proofs", v);
