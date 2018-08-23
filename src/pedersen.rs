@@ -855,13 +855,15 @@ impl Secp256k1 {
 
 #[cfg(test)]
 mod tests {
+    extern crate chrono;
     use super::{Commitment, RangeProof, ProofMessage, Message, Secp256k1};
     use ContextFlag;
     use key::{ONE_KEY, ZERO_KEY, SecretKey};
 
     use rand::os::OsRng;
-	use rand::{Rng, thread_rng};
+    use rand::{Rng, thread_rng};
 
+    use pedersen::tests::chrono::prelude::*;
 
     #[test]
     fn test_verify_commit_sum_zero_keys() {
@@ -1128,6 +1130,44 @@ mod tests {
 			nonce, None, bullet_proof);
 		if !proof_info.is_err(){
 			panic!("Bullet proof verify with message should have errored.");
+		}
+	}
+
+	#[ignore]
+	#[test]
+	fn bench_bullet_proof_single_vs_multi() {
+		let nano_to_millis = 1.0 / 1_000_000.0;
+
+		let secp = Secp256k1::with_caps(ContextFlag::Commit);
+		let blinding = SecretKey::new(&secp, &mut OsRng::new().unwrap());
+		let value = 12345678;
+
+		let increments = vec![1,5,10,100,200];
+
+		for v in increments {
+			let mut commits:Vec<Commitment> = vec![];
+			let mut proofs:Vec<RangeProof> = vec![];
+			for _ in 0..v {
+				commits.push(secp.commit(value, blinding).unwrap());
+				proofs.push(secp.bullet_proof(value, blinding, blinding, None));
+			}
+			println!("--------");
+			println!("Comparing {} Proofs", v);
+			let start = Utc::now().timestamp_nanos();
+			for i in 0..v {
+				let proof_range = secp.verify_bullet_proof(commits[i].clone(), proofs[i].clone(), None).unwrap();
+				assert_eq!(proof_range.min, 0);
+			}
+			let fin = Utc::now().timestamp_nanos();
+			let dur_ms = (fin-start) as f64 * nano_to_millis;
+			println!("{} proofs single validated in {}ms", v, dur_ms);
+
+			let start = Utc::now().timestamp_nanos();
+			let proof_range = secp.verify_bullet_proof_multi(commits.clone(), proofs.clone(), None);
+			assert!(!proof_range.is_err());
+			let fin = Utc::now().timestamp_nanos();
+			let dur_ms = (fin-start) as f64 * nano_to_millis;
+			println!("{} proofs batch validated in {}ms", v, dur_ms);
 		}
 	}
 
