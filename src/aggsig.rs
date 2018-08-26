@@ -111,6 +111,10 @@ pub fn verify_single(secp: &Secp256k1, sig:&Signature, msg:&Message, pubnonce:Op
         false => 0,
     };
 
+    if (sig.0).0.ends_with(&[0u8; 32]) || (pubkey.0).0.starts_with(&[0u8; 32]) {
+        return false;
+    }
+
     let retval = unsafe {
         ffi::secp256k1_aggsig_verify_single(secp.ctx,
                                             sig.as_ptr(),
@@ -276,7 +280,8 @@ impl Drop for AggSigContext {
 #[cfg(test)]
 mod tests {
     use ContextFlag;
-    use {Message, AggSigPartialSignature};
+    use ffi;
+    use {Message, Signature, AggSigPartialSignature};
     use super::{AggSigContext, Secp256k1, sign_single, verify_single, export_secnonce_single, add_signatures_single};
     use rand::{Rng, thread_rng};
     use key::{SecretKey, PublicKey};
@@ -356,6 +361,65 @@ mod tests {
         println!("Verifying aggsig single: {:?}, msg: {:?}, pk:{:?}", sig, msg, pk);
         let result = verify_single(&secp, &sig, &msg, None, &pk, false);
         println!("Signature verification single (wrong message): {}", result);
+        assert!(result==false);
+    }
+
+    #[test]
+    fn test_aggsig_fuzz() {
+        let secp = Secp256k1::with_caps(ContextFlag::Full);
+        let (sk, pk) = secp.generate_keypair(&mut thread_rng()).unwrap();
+
+        println!("Performing aggsig single context with seckey, pubkey: {:?},{:?}", sk, pk);
+
+        let mut msg = [0u8; 32];
+        thread_rng().fill_bytes(&mut msg);
+        let msg = Message::from_slice(&msg).unwrap();
+        let sig=sign_single(&secp, &msg, &sk, None, None, None).unwrap();
+
+        // force sig[32..] as 0 to simulate Fuzz test
+        let corrupted = &mut [0u8; 64];
+        let mut i = 0;
+        for elem in corrupted[..32].iter_mut() {
+            *elem = sig.0[i];
+            i += 1;
+        }
+        let corrupted_sig: Signature = Signature{0:ffi::Signature(*corrupted)};
+        println!("Verifying aggsig single: {:?}, msg: {:?}, pk:{:?}", corrupted_sig, msg, pk);
+        let result = verify_single(&secp, &corrupted_sig, &msg, None, &pk, false);
+        println!("Signature verification single (correct): {}", result);
+        assert!(result==false);
+
+        // force sig[0..32] as 0 to simulate Fuzz test
+        let corrupted = &mut [0u8; 64];
+        let mut i = 32;
+        for elem in corrupted[32..].iter_mut() {
+            *elem = sig.0[i];
+            i += 1;
+        }
+        let corrupted_sig: Signature = Signature{0:ffi::Signature(*corrupted)};
+        println!("Verifying aggsig single: {:?}, msg: {:?}, pk:{:?}", corrupted_sig, msg, pk);
+        let result = verify_single(&secp, &corrupted_sig, &msg, None, &pk, false);
+        println!("Signature verification single (correct): {}", result);
+        assert!(result==false);
+
+        // force pk as 0 to simulate Fuzz test
+        let zero_pk = PublicKey::new();
+        println!("Verifying aggsig single: {:?}, msg: {:?}, pk:{:?}", sig, msg, zero_pk);
+        let result = verify_single(&secp, &sig, &msg, None, &zero_pk, false);
+        println!("Signature verification single (correct): {}", result);
+        assert!(result==false);
+
+        // force pk[0..32] as 0 to simulate Fuzz test
+        let corrupted = &mut [0u8; 64];
+        let mut i = 32;
+        for elem in corrupted[32..].iter_mut() {
+            *elem = pk.0[i];
+            i += 1;
+        }
+        let corrupted_pk: PublicKey = PublicKey{0:ffi::PublicKey(*corrupted)};
+        println!("Verifying aggsig single: {:?}, msg: {:?}, pk:{:?}", sig, msg, corrupted_pk);
+        let result = verify_single(&secp, &sig, &msg, None, &corrupted_pk, false);
+        println!("Signature verification single (correct): {}", result);
         assert!(result==false);
     }
 
