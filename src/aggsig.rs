@@ -24,6 +24,13 @@ use {Message, Error, Signature, AggSigPartialSignature};
 use key::{SecretKey, PublicKey};
 use std::ptr;
 
+/// The 256 bits 0
+const ZERO_256: [u8; 32] = [0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0];
+
+
 /// Single-Signer (plain old Schnorr, sans-multisig) export nonce
 /// Returns: Ok(SecretKey) on success
 /// In: 
@@ -111,7 +118,7 @@ pub fn verify_single(secp: &Secp256k1, sig:&Signature, msg:&Message, pubnonce:Op
         false => 0,
     };
 
-    if (sig.0).0.ends_with(&[0u8; 32]) || (pubkey.0).0.starts_with(&[0u8; 32]) {
+    if (sig.0).0.ends_with(&ZERO_256) || (pubkey.0).0.starts_with(&ZERO_256) {
         return false;
     }
 
