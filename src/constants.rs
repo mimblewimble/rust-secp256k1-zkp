@@ -59,8 +59,8 @@ pub const PROOF_MSG_SIZE: usize = 2048;
 #[cfg(feature = "bullet-proof-sizing")]
 pub const PROOF_MSG_SIZE: usize = 2048;
 
-/// The maximum size of a message embedded in a bullet proof
-pub const BULLET_PROOF_MSG_SIZE: usize = 64;
+/// The maximum size of an optional message embedded in a bullet proof
+pub const BULLET_PROOF_MSG_SIZE: usize = 16;
 
 /// The order of the secp256k1 curve
 pub const CURVE_ORDER: [u8; 32] = [
@@ -97,7 +97,7 @@ pub const GENERATOR_G : [u8;33] = [
 
 /// Generator H (as compressed curve point (3))
 pub const GENERATOR_H : [u8;33] = [
-    0x0b,
+    0x11,
     0x50, 0x92, 0x9b, 0x74, 0xc1, 0xa0, 0x49, 0x54,
     0xb7, 0x8b, 0x4b, 0x60, 0x35, 0xe9, 0x7a, 0x5e,
     0x07, 0x8a, 0x5a, 0x0f, 0x28, 0xec, 0x96, 0xd5,
@@ -106,7 +106,7 @@ pub const GENERATOR_H : [u8;33] = [
 
 /// Generator J, for switch commitments (as compressed curve point (3))
 pub const GENERATOR_J : [u8;33] = [
-    0x0b,
+    0x11,
     0xb8, 0x60, 0xf5, 0x67, 0x95, 0xfc, 0x03, 0xf3,
     0xc2, 0x16, 0x85, 0x38, 0x3d, 0x1b, 0x5a, 0x2f,
     0x29, 0x54, 0xf4, 0x9b, 0x7e, 0x39, 0x8b, 0x8d,
