@@ -299,6 +299,7 @@ extern "C" {
                                         secnonce32: *const c_uchar,
                                         pubnonce_for_e: *const PublicKey,
                                         pubnonce_total: *const PublicKey,
+                                        pubkey_for_e: *const PublicKey,
                                         seed32: *const c_uchar)
                                            -> c_int;
 
@@ -307,6 +308,7 @@ extern "C" {
                                           msg32: *const c_uchar,
                                           pubnonce: *const PublicKey,
                                           pk: *const PublicKey,
+                                          pk_total: *const PublicKey,
                                           is_partial: c_uint)
                                            -> c_int;
 
