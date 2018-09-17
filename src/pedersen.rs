@@ -435,10 +435,10 @@ impl Secp256k1 {
 	/// Convenience function for generating a random nonce for a range proof.
 	/// We will need the nonce later if we want to rewind the range proof.
 	pub fn nonce(&self) -> [u8; 32] {
-	    let mut rng = OsRng::new().unwrap();
-	    let mut nonce = [0u8; 32];
-        RngCore::fill_bytes(&mut rng, &mut nonce);
-	    nonce
+		let mut rng = OsRng::new().unwrap();
+		let mut nonce = [0u8; 32];
+		RngCore::fill_bytes(&mut rng, &mut nonce);
+		nonce
 	}
 
 	/// Produces a range proof for the provided value, using min and max
@@ -1006,7 +1006,7 @@ mod tests {
 
 		let mut msg = [0u8; 32];
 		let mut rng = thread_rng();
-        RngCore::fill_bytes(&mut rng, &mut msg);
+		RngCore::fill_bytes(&mut rng, &mut msg);
 		let msg = Message::from_slice(&msg).unwrap();
 
 		let sig = secp.sign(&msg, &blinding).unwrap();
