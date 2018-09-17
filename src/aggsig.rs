@@ -201,7 +201,7 @@ impl AggSigContext {
     pub fn new(secp: &Secp256k1, pubkeys: &Vec<PublicKey>) -> AggSigContext {
         let mut seed = [0; 32];
         let mut rng = thread_rng();
-         RngCore::fill_bytes(&mut rng, &mut seed);
+        RngCore::fill_bytes(&mut rng, &mut seed);
         let pubkeys:Vec<*const ffi::PublicKey> = pubkeys.into_iter()
             .map(|p| p.as_ptr())
             .collect();
