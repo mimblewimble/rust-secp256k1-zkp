@@ -30,7 +30,7 @@ use constants;
 use ffi;
 use key::{self, SecretKey};
 use super::{Message, Signature};
-use rand::{Rng, OsRng};
+use rand::{OsRng, RngCore};
 use serde::{ser, de};
 
 const MAX_WIDTH:usize = 1 << 20;
@@ -437,7 +437,7 @@ impl Secp256k1 {
 	pub fn nonce(&self) -> [u8; 32] {
 	    let mut rng = OsRng::new().unwrap();
 	    let mut nonce = [0u8; 32];
-	    rng.fill_bytes(&mut nonce);
+        RngCore::fill_bytes(&mut rng, &mut nonce);
 	    nonce
 	}
 
@@ -892,8 +892,7 @@ mod tests {
     use ContextFlag;
     use key::{ONE_KEY, ZERO_KEY, SecretKey};
 
-    use rand::os::OsRng;
-    use rand::{Rng, thread_rng};
+    use rand::{OsRng, RngCore, thread_rng};
 
     use pedersen::tests::chrono::prelude::*;
 
@@ -1006,7 +1005,8 @@ mod tests {
 		let commit = secp.commit(0u64, blinding).unwrap();
 
 		let mut msg = [0u8; 32];
-		thread_rng().fill_bytes(&mut msg);
+		let mut rng = thread_rng();
+        RngCore::fill_bytes(&mut rng, &mut msg);
 		let msg = Message::from_slice(&msg).unwrap();
 
 		let sig = secp.sign(&msg, &blinding).unwrap();

@@ -49,7 +49,7 @@ extern crate rand;
 
 use libc::size_t;
 use std::{error, fmt, ops, ptr};
-use rand::Rng;
+use rand::{Rng, RngCore};
 
 #[macro_use]
 mod macros;
@@ -585,7 +585,7 @@ impl Secp256k1 {
     /// see comment in libsecp256k1 commit d2275795f by Gregory Maxwell
     pub fn randomize<R: Rng>(&mut self, rng: &mut R) {
         let mut seed = [0; 32];
-        rng.fill_bytes(&mut seed);
+        RngCore::fill_bytes(rng, &mut seed);
         unsafe {
             let err = ffi::secp256k1_context_randomize(self.ctx, seed.as_ptr());
             // This function cannot fail; it has an error return for future-proofing.
@@ -692,7 +692,7 @@ impl Secp256k1 {
 
 #[cfg(test)]
 mod tests {
-    use rand::{Rng, thread_rng};
+    use rand::{RngCore, thread_rng};
     use serialize::hex::FromHex;
     use key::{SecretKey, PublicKey};
     use super::constants;
@@ -710,7 +710,8 @@ mod tests {
         let full = Secp256k1::with_caps(ContextFlag::Full);
 
         let mut msg = [0u8; 32];
-        thread_rng().fill_bytes(&mut msg);
+        let mut rng = thread_rng();
+        RngCore::fill_bytes(&mut rng, &mut msg);
         let msg = Message::from_slice(&msg).unwrap();
 
         // Try key generation
@@ -770,7 +771,8 @@ mod tests {
         let sig = RecoverableSignature::from_compact(&s, &[1; 64], RecoveryId(0)).unwrap();
         let pk = PublicKey::new();
         let mut msg = [0u8; 32];
-        thread_rng().fill_bytes(&mut msg);
+        let mut rng = thread_rng();
+        RngCore::fill_bytes(&mut rng, &mut msg);
         let msg = Message::from_slice(&msg).unwrap();
 
         assert_eq!(s.verify(&msg, &sig.to_standard(&s), &pk), Err(InvalidPublicKey));
@@ -806,7 +808,8 @@ mod tests {
 
         let mut msg = [0; 32];
         for _ in 0..100 {
-            thread_rng().fill_bytes(&mut msg);
+            let mut rng = thread_rng();
+            RngCore::fill_bytes(&mut rng, &mut msg);
             let msg = Message::from_slice(&msg).unwrap();
 
             let (sk, _) = s.generate_keypair(&mut thread_rng()).unwrap();
@@ -854,7 +857,8 @@ mod tests {
 
         let mut msg = [0; 32];
         for _ in 0..100 {
-            thread_rng().fill_bytes(&mut msg);
+            let mut rng = thread_rng();
+            RngCore::fill_bytes(&mut rng, &mut msg);
             let msg = Message::from_slice(&msg).unwrap();
 
             let (sk, pk) = s.generate_keypair(&mut thread_rng()).unwrap();
@@ -899,7 +903,8 @@ mod tests {
         s.randomize(&mut thread_rng());
 
         let mut msg = [0u8; 32];
-        thread_rng().fill_bytes(&mut msg);
+        let mut rng = thread_rng();
+        RngCore::fill_bytes(&mut rng, &mut msg);
         let msg = Message::from_slice(&msg).unwrap();
 
         let (sk, pk) = s.generate_keypair(&mut thread_rng()).unwrap();
@@ -922,7 +927,8 @@ mod tests {
         s.randomize(&mut thread_rng());
 
         let mut msg = [0u8; 32];
-        thread_rng().fill_bytes(&mut msg);
+        let mut rng = thread_rng();
+        RngCore::fill_bytes(&mut rng, &mut msg);
         let msg = Message::from_slice(&msg).unwrap();
 
         let (sk, pk) = s.generate_keypair(&mut thread_rng()).unwrap();
@@ -1082,7 +1088,8 @@ mod benches {
     pub fn bench_verify(bh: &mut Bencher) {
         let s = Secp256k1::new();
         let mut msg = [0u8; 32];
-        thread_rng().fill_bytes(&mut msg);
+        let mut rng = thread_rng();
+        RngCore::fill_bytes(&mut rng, &mut msg);
         let msg = Message::from_slice(&msg).unwrap();
         let (sk, pk) = s.generate_keypair(&mut thread_rng()).unwrap();
         let sig = s.sign(&msg, &sk).unwrap();
@@ -1097,7 +1104,8 @@ mod benches {
     pub fn bench_recover(bh: &mut Bencher) {
         let s = Secp256k1::new();
         let mut msg = [0u8; 32];
-        thread_rng().fill_bytes(&mut msg);
+        let mut rng = thread_rng();
+        RngCore::fill_bytes(&mut rng, &mut msg);
         let msg = Message::from_slice(&msg).unwrap();
         let (sk, _) = s.generate_keypair(&mut thread_rng()).unwrap();
         let sig = s.sign_recoverable(&msg, &sk).unwrap();
