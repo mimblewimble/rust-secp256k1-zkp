@@ -653,6 +653,13 @@ impl Secp256k1 {
 				None => ptr::null(),
 		};
 
+		// TODO: expose multi-party support
+		let tau_x = ptr::null_mut();
+		let t_one = ptr::null_mut();
+		let t_two = ptr::null_mut();
+		let commits = ptr::null_mut();
+		let private_nonce = ptr::null();
+
 		let _success = unsafe {
 			let scratch = ffi::secp256k1_scratch_space_create(self.ctx, SCRATCH_SPACE_SIZE);
 			let result = ffi::secp256k1_bulletproof_rangeproof_prove(
@@ -661,13 +668,18 @@ impl Secp256k1 {
 				shared_generators(self.ctx),
 				proof.as_mut_ptr(),
 				&mut plen,
+				tau_x,
+				t_one,
+				t_two,
 				&value,
 				ptr::null(),	// min_values: NULL for all-zeroes minimum values to prove ranges above
 				blind_vec.as_ptr(),
+				commits,
 				1,
 				constants::GENERATOR_H.as_ptr(),
 				n_bits as size_t,
 				nonce.as_ptr(),
+				private_nonce,
 				extra_data.as_ptr(),
 				extra_data_len as size_t,
 				message_ptr,
