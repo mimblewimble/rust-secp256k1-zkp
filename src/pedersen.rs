@@ -30,7 +30,7 @@ use constants;
 use ffi;
 use key::{self, SecretKey};
 use super::{Message, Signature};
-use rand::{OsRng, RngCore};
+use rand::{RngCore, prelude::thread_rng};
 use serde::{ser, de};
 
 const MAX_WIDTH:usize = 1 << 20;
@@ -435,9 +435,8 @@ impl Secp256k1 {
 	/// Convenience function for generating a random nonce for a range proof.
 	/// We will need the nonce later if we want to rewind the range proof.
 	pub fn nonce(&self) -> [u8; 32] {
-		let mut rng = OsRng::new().unwrap();
 		let mut nonce = [0u8; 32];
-		RngCore::fill_bytes(&mut rng, &mut nonce);
+		thread_rng().fill_bytes(&mut nonce);
 		nonce
 	}
 
@@ -892,7 +891,7 @@ mod tests {
     use ContextFlag;
     use key::{ONE_KEY, ZERO_KEY, SecretKey};
 
-    use rand::{OsRng, RngCore, thread_rng};
+    use rand::{OsRng, RngCore, prelude::thread_rng};
 
     use pedersen::tests::chrono::prelude::*;
 
@@ -1005,8 +1004,7 @@ mod tests {
 		let commit = secp.commit(0u64, blinding).unwrap();
 
 		let mut msg = [0u8; 32];
-		let mut rng = thread_rng();
-		RngCore::fill_bytes(&mut rng, &mut msg);
+		thread_rng().fill_bytes(&mut msg);
 		let msg = Message::from_slice(&msg).unwrap();
 
 		let sig = secp.sign(&msg, &blinding).unwrap();
