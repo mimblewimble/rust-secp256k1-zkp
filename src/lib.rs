@@ -584,7 +584,7 @@ impl Secp256k1 {
     /// (Re)randomizes the Secp256k1 context for cheap sidechannel resistence;
     /// see comment in libsecp256k1 commit d2275795f by Gregory Maxwell
     pub fn randomize<R: Rng>(&mut self, rng: &mut R) {
-        let mut seed = [0; 32];
+        let mut seed = [0u8; 32];
         RngCore::fill_bytes(rng, &mut seed);
         unsafe {
             let err = ffi::secp256k1_context_randomize(self.ctx, seed.as_ptr());
