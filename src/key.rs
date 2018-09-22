@@ -374,7 +374,7 @@ mod test {
     use super::{PublicKey, SecretKey};
     use super::super::constants;
 
-    use rand::{Error, RngCore, thread_rng};
+    use rand::{Error, RngCore, prelude::thread_rng};
     use self::rand_core::impls;
 
     #[test]
