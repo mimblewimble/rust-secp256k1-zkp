@@ -348,7 +348,7 @@ impl Secp256k1 {
 			return Err(Error::IncapableContext);
 		}
 		let mut commit = [0; 33];
-		let zblind = [0; 32];
+		let zblind = [0u8; 32];
 
 		unsafe {
 			ffi::secp256k1_pedersen_commit(
