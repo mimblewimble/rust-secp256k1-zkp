@@ -39,7 +39,7 @@ const ZERO_256: [u8; 32] = [0, 0, 0, 0, 0, 0, 0, 0,
 pub fn export_secnonce_single(secp: &Secp256k1) ->
                        Result<SecretKey, Error> {
     let mut return_key = SecretKey::new(&secp, &mut thread_rng());
-    let mut seed = [0; 32];
+    let mut seed = [0u8; 32];
     thread_rng().fill(&mut seed);
     let retval = unsafe {
         ffi::secp256k1_aggsig_export_secnonce_single(secp.ctx,
@@ -65,7 +65,7 @@ pub fn export_secnonce_single(secp: &Secp256k1) ->
 pub fn sign_single(secp: &Secp256k1, msg:&Message, seckey:&SecretKey, secnonce:Option<&SecretKey>, extra: Option<&SecretKey>, pubnonce:Option<&PublicKey>, pubkey_for_e: Option<&PublicKey>, final_nonce_sum:Option<&PublicKey> ) ->
                     Result<Signature, Error> {
     let mut retsig = Signature::from(ffi::Signature::new());
-    let mut seed = [0; 32];
+    let mut seed = [0u8; 32];
     thread_rng().fill(&mut seed);
 
     let secnonce = match secnonce {
@@ -198,7 +198,7 @@ pub struct AggSigContext {
 impl AggSigContext {
     /// Creates new aggsig context with a new random seed
     pub fn new(secp: &Secp256k1, pubkeys: &Vec<PublicKey>) -> AggSigContext {
-        let mut seed = [0; 32];
+        let mut seed = [0u8; 32];
         thread_rng().fill(&mut seed);
         let pubkeys:Vec<*const ffi::PublicKey> = pubkeys.into_iter()
             .map(|p| p.as_ptr())
