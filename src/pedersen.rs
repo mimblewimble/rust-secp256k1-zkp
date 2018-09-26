@@ -30,7 +30,7 @@ use constants;
 use ffi;
 use key::{self, SecretKey};
 use super::{Message, Signature};
-use rand::{OsRng, RngCore};
+use rand::{Rng, prelude::thread_rng};
 use serde::{ser, de};
 
 const MAX_WIDTH:usize = 1 << 20;
@@ -435,10 +435,7 @@ impl Secp256k1 {
 	/// Convenience function for generating a random nonce for a range proof.
 	/// We will need the nonce later if we want to rewind the range proof.
 	pub fn nonce(&self) -> [u8; 32] {
-		let mut rng = OsRng::new().unwrap();
-		let mut nonce = [0u8; 32];
-		RngCore::fill_bytes(&mut rng, &mut nonce);
-		nonce
+		thread_rng().gen::<[u8; 32]>()
 	}
 
 	/// Produces a range proof for the provided value, using min and max
@@ -892,7 +889,7 @@ mod tests {
     use ContextFlag;
     use key::{ONE_KEY, ZERO_KEY, SecretKey};
 
-    use rand::{OsRng, RngCore, thread_rng};
+    use rand::{Rng, prelude::thread_rng};
 
     use pedersen::tests::chrono::prelude::*;
 
@@ -968,8 +965,8 @@ mod tests {
             secp.commit(value, blinding).unwrap()
         }
 
-        let blind_pos = SecretKey::new(&secp, &mut OsRng::new().unwrap());
-        let blind_neg = SecretKey::new(&secp, &mut OsRng::new().unwrap());
+        let blind_pos = SecretKey::new(&secp, &mut thread_rng());
+        let blind_neg = SecretKey::new(&secp, &mut thread_rng());
 
         // now construct blinding factor to net out appropriately
         let blind_sum = secp.blind_sum(vec![blind_pos], vec![blind_neg]).unwrap();
@@ -985,7 +982,7 @@ mod tests {
 	// provide an api to extract a public key from a commitment
 	fn test_to_pubkey() {
 		let secp = Secp256k1::with_caps(ContextFlag::Commit);
-		let blinding = SecretKey::new(&secp, &mut OsRng::new().unwrap());
+		let blinding = SecretKey::new(&secp, &mut thread_rng());
 		let commit = secp.commit(5, blinding).unwrap();
 		let pubkey = commit.to_pubkey(&secp);
 		match pubkey {
@@ -1001,12 +998,11 @@ mod tests {
 	#[test]
 	fn test_sign_with_pubkey_from_commitment() {
 		let secp = Secp256k1::with_caps(ContextFlag::Commit);
-		let blinding = SecretKey::new(&secp, &mut OsRng::new().unwrap());
+		let blinding = SecretKey::new(&secp, &mut thread_rng());
 		let commit = secp.commit(0u64, blinding).unwrap();
 
 		let mut msg = [0u8; 32];
-		let mut rng = thread_rng();
-		RngCore::fill_bytes(&mut rng, &mut msg);
+		thread_rng().fill(&mut msg);
 		let msg = Message::from_slice(&msg).unwrap();
 
 		let sig = secp.sign(&msg, &blinding).unwrap();
@@ -1030,8 +1026,8 @@ mod tests {
 			secp.commit(value, blinding).unwrap()
 		}
 
-		let blind_a = SecretKey::new(&secp, &mut OsRng::new().unwrap());
-		let blind_b = SecretKey::new(&secp, &mut OsRng::new().unwrap());
+		let blind_a = SecretKey::new(&secp, &mut thread_rng());
+		let blind_b = SecretKey::new(&secp, &mut thread_rng());
 
 		let commit_a = commit(3, blind_a);
 		let commit_b = commit(2, blind_b);
@@ -1054,7 +1050,7 @@ mod tests {
 	#[test]
 	fn test_range_proof() {
 		let secp = Secp256k1::with_caps(ContextFlag::Commit);
-		let blinding = SecretKey::new(&secp, &mut OsRng::new().unwrap());
+		let blinding = SecretKey::new(&secp, &mut thread_rng());
 		let commit = secp.commit(7, blinding).unwrap();
 		let msg = ProofMessage::empty();
 		let range_proof = secp.range_proof(0, 7, blinding, commit, msg.clone());
@@ -1074,7 +1070,7 @@ mod tests {
 		assert_eq!(proof_info.value, 7);
 
 		// check we cannot rewind a range proof without the original nonce
-		let bad_nonce = SecretKey::new(&secp, &mut OsRng::new().unwrap());
+		let bad_nonce = SecretKey::new(&secp, &mut thread_rng());
 		let bad_info = secp.rewind_range_proof(commit, range_proof, bad_nonce);
 		assert_eq!(bad_info.success, false);
 		assert_eq!(bad_info.value, 0);
@@ -1093,7 +1089,7 @@ mod tests {
 	fn test_bullet_proof() {
 		// Test Bulletproofs without message
 		let secp = Secp256k1::with_caps(ContextFlag::Commit);
-		let blinding = SecretKey::new(&secp, &mut OsRng::new().unwrap());
+		let blinding = SecretKey::new(&secp, &mut thread_rng());
 		let value = 12345678;
 		let commit = secp.commit(value, blinding).unwrap();
 		let bullet_proof = secp.bullet_proof(value, blinding, blinding, None, None);
@@ -1114,7 +1110,7 @@ mod tests {
 		// wrong blinding
 		let value = 12345678;
 		let commit = secp.commit(value, blinding).unwrap();
-		let blinding = SecretKey::new(&secp, &mut OsRng::new().unwrap());
+		let blinding = SecretKey::new(&secp, &mut thread_rng());
 		let bullet_proof = secp.bullet_proof(value, blinding, blinding, None, None);
 		if !secp.verify_bullet_proof(commit, bullet_proof, None).is_err(){
 			panic!("Bullet proof verify should have errored");
@@ -1122,7 +1118,7 @@ mod tests {
 
 		// Commit to some extra data in the bulletproof
 		let extra_data = [0u8;32].to_vec();
-		let blinding = SecretKey::new(&secp, &mut OsRng::new().unwrap());
+		let blinding = SecretKey::new(&secp, &mut thread_rng());
 		let value = 12345678;
 		let commit = secp.commit(value, blinding).unwrap();
 		let bullet_proof = secp.bullet_proof(value, blinding, blinding, Some(extra_data.clone()), None);
@@ -1139,8 +1135,8 @@ mod tests {
 
 		// Ensure rewinding works
 
-		let blinding = SecretKey::new(&secp, &mut OsRng::new().unwrap());
-		let nonce = SecretKey::new(&secp, &mut OsRng::new().unwrap());
+		let blinding = SecretKey::new(&secp, &mut thread_rng());
+		let nonce = SecretKey::new(&secp, &mut thread_rng());
 		let value = 12345678;
 		let commit = secp.commit(value, blinding).unwrap();
 
@@ -1178,8 +1174,8 @@ mod tests {
 	#[test]
 	fn rewind_message() {
 		let secp = Secp256k1::with_caps(ContextFlag::Commit);
-		let blinding = SecretKey::new(&secp, &mut OsRng::new().unwrap());
-		let nonce = SecretKey::new(&secp, &mut OsRng::new().unwrap());
+		let blinding = SecretKey::new(&secp, &mut thread_rng());
+		let nonce = SecretKey::new(&secp, &mut thread_rng());
 		let value = <u64>::max_value()-1;
 		let commit = secp.commit(value, blinding).unwrap();
 
@@ -1197,7 +1193,7 @@ mod tests {
 		let nano_to_millis = 1.0 / 1_000_000.0;
 
 		let secp = Secp256k1::with_caps(ContextFlag::Commit);
-		let blinding = SecretKey::new(&secp, &mut OsRng::new().unwrap());
+		let blinding = SecretKey::new(&secp, &mut thread_rng());
 		let value = 12345678;
 
 		let increments = vec![1,2,5,10,100,200];
@@ -1235,8 +1231,8 @@ mod tests {
 		let mut proofs:Vec<RangeProof> = vec![];
 
 		let secp = Secp256k1::with_caps(ContextFlag::Commit);
-		let blinding = SecretKey::new(&secp, &mut OsRng::new().unwrap());
-		let wrong_blinding = SecretKey::new(&secp, &mut OsRng::new().unwrap());
+		let blinding = SecretKey::new(&secp, &mut thread_rng());
+		let wrong_blinding = SecretKey::new(&secp, &mut thread_rng());
 		let value = 12345678;
 
 		let wrong_commit = secp.commit(value, wrong_blinding).unwrap();
