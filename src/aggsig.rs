@@ -52,6 +52,32 @@ pub fn export_secnonce_single(secp: &Secp256k1) ->
     Ok(return_key)
 }
 
+// This is a macro that check zero public key
+macro_rules! is_zero_pubkey {
+    (reterr => $e:expr) => {
+            match $e {
+                Some(n) => {
+                    if (n.0).0.starts_with(&ZERO_256) {
+                        return Err(Error::InvalidPublicKey);
+                    }
+                    n.as_ptr()
+                },
+                None => ptr::null(),
+            }
+    };
+    (retfalse => $e:expr) => {
+            match $e {
+                Some(n) => {
+                    if (n.0).0.starts_with(&ZERO_256) {
+                        return false;
+                    }
+                    n.as_ptr()
+                },
+                None => ptr::null(),
+            }
+    };
+}
+
 /// Single-Signer (plain old Schnorr, sans-multisig) signature creation
 /// Returns: Ok(Signature) on success
 /// In: 
@@ -73,25 +99,16 @@ pub fn sign_single(secp: &Secp256k1, msg:&Message, seckey:&SecretKey, secnonce:O
         None => ptr::null(),
     };
 
-    let pubnonce = match pubnonce {
-        Some(n) => n.as_ptr(),
-        None => ptr::null(),
-    };
+    let pubnonce = is_zero_pubkey!(reterr => pubnonce);
 
     let extra = match extra {
         Some(e) => e.as_ptr(),
         None => ptr::null(),
     };
 
-    let final_nonce_sum = match final_nonce_sum {
-        Some(n) => n.as_ptr(),
-        None => ptr::null(),
-    };
+    let final_nonce_sum = is_zero_pubkey!(reterr => final_nonce_sum);
 
-    let pe = match pubkey_for_e {
-        Some(n) => n.as_ptr(),
-        None => ptr::null(),
-    };
+    let pe = is_zero_pubkey!(reterr => pubkey_for_e);
 
     let retval = unsafe {
         ffi::secp256k1_aggsig_sign_single(secp.ctx,
@@ -122,20 +139,11 @@ pub fn sign_single(secp: &Secp256k1, msg:&Message, seckey:&SecretKey, secnonce:O
 /// is_partial: whether this is a partial sig, or a fully-combined sig
 pub fn verify_single(secp: &Secp256k1, sig:&Signature, msg:&Message, pubnonce:Option<&PublicKey>, pubkey:&PublicKey, pubkey_total_for_e: Option<&PublicKey>, extra_pubkey: Option<&PublicKey>, is_partial: bool) ->
                      bool {
-    let pubnonce = match pubnonce {
-        Some(n) => n.as_ptr(),
-        None => ptr::null(),
-    };
+    let pubnonce = is_zero_pubkey!(retfalse => pubnonce);
 
-    let pe = match pubkey_total_for_e {
-        Some(n) => n.as_ptr(),
-        None => ptr::null(),
-    };
+    let pe = is_zero_pubkey!(retfalse => pubkey_total_for_e);
 
-    let extra = match extra_pubkey {
-        Some(e) => e.as_ptr(),
-        None => ptr::null(),
-    };
+    let extra = is_zero_pubkey!(retfalse => extra_pubkey);
 
     let is_partial = match is_partial {
         true => 1,
@@ -463,6 +471,18 @@ mod tests {
         let result = verify_single(&secp, &sig, &msg, None, &corrupted_pk, None, None, false);
         println!("Signature verification single (correct): {}", result);
         assert!(result==false);
+
+        // more tests on other parameters
+        let zero_pk = PublicKey::new();
+        let result = verify_single(&secp, &sig, &msg, Some(&zero_pk), &zero_pk, Some(&zero_pk), Some(&zero_pk), false);
+        assert!(result==false);
+
+        let mut msg = [0u8; 32];
+        thread_rng().fill(&mut msg);
+        let msg = Message::from_slice(&msg).unwrap();
+        if sign_single(&secp, &msg, &sk, None, None, Some(&zero_pk), Some(&zero_pk), Some(&zero_pk)).is_ok() {
+            panic!("sign_single should fail on zero public key, but not!");
+        }
     }
 
     #[test]
