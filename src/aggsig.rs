@@ -19,7 +19,7 @@
 
 use Secp256k1;
 use ffi;
-use rand::{Rng, prelude::thread_rng};
+use rand::{Rng, thread_rng};
 use {Message, Error, Signature, AggSigPartialSignature};
 use key::{SecretKey, PublicKey};
 use std::ptr;
@@ -316,7 +316,7 @@ mod tests {
     use ffi;
     use {Message, Signature, AggSigPartialSignature};
     use super::{AggSigContext, Secp256k1, sign_single, verify_single, export_secnonce_single, add_signatures_single};
-    use rand::{Rng, prelude::thread_rng};
+    use rand::{Rng, thread_rng};
     use key::{SecretKey, PublicKey};
 
     #[test]

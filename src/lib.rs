@@ -692,7 +692,7 @@ impl Secp256k1 {
 
 #[cfg(test)]
 mod tests {
-    use rand::{Rng, prelude::thread_rng};
+    use rand::{Rng, thread_rng};
     use serialize::hex::FromHex;
     use key::{SecretKey, PublicKey};
     use super::constants;

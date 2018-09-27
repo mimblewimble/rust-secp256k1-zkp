@@ -30,7 +30,7 @@ use constants;
 use ffi;
 use key::{self, SecretKey};
 use super::{Message, Signature};
-use rand::{Rng, prelude::thread_rng};
+use rand::{Rng, thread_rng};
 use serde::{ser, de};
 
 const MAX_WIDTH:usize = 1 << 20;
@@ -889,7 +889,7 @@ mod tests {
     use ContextFlag;
     use key::{ONE_KEY, ZERO_KEY, SecretKey};
 
-    use rand::{Rng, prelude::thread_rng};
+    use rand::{Rng, thread_rng};
 
     use pedersen::tests::chrono::prelude::*;
 
