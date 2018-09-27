@@ -1276,83 +1276,136 @@ mod tests {
 
 	}
 
-    #[test]
-    fn test_bullet_proof_multisig() {
-        // Test Bulletproofs multisig without message
-        let secp = Secp256k1::with_caps(ContextFlag::Commit);
-        let blinding1 = SecretKey::new(&secp, &mut thread_rng());
-        let value = 12345678;
-        let mut commits = vec![];
-        let partial_commit1 = secp.commit(value, blinding1).unwrap();
-        commits.push(partial_commit1);
+	#[test]
+	fn test_bullet_proof_multisig() {
+		// Test Bulletproofs multisig without message
+		let secp = Secp256k1::with_caps(ContextFlag::Commit);
+		let blinding_a = SecretKey::new(&secp, &mut thread_rng());
+		let value = 12345678;
+		let partial_commit_a = secp.commit(value, blinding_a).unwrap();
 
-        let blinding2 = SecretKey::new(&secp, &mut thread_rng());
-        let partial_commit2 = secp.commit(0, blinding2).unwrap();
-        commits.push(partial_commit2);
+		let blinding_b = SecretKey::new(&secp, &mut thread_rng());
+		let partial_commit_b = secp.commit(0, blinding_b).unwrap();
 
-	let common_nonce = SecretKey::new(&secp, &mut thread_rng());
+		// upfront step: party A and party B generate self commitment and communicate to each other,
+		//   to get the total commitment.
+		let commit = secp
+			.commit_sum(vec![partial_commit_a, partial_commit_b], vec![])
+			.unwrap();
+		let mut commits = vec![];
+		commits.push(commit);
 
-	let private_nonce1 = SecretKey::new(&secp, &mut thread_rng());
-	let private_nonce2 = SecretKey::new(&secp, &mut thread_rng());
-        let mut t_one = PublicKey::new();
-        let mut t_two = PublicKey::new();
+		let common_nonce = SecretKey::new(&secp, &mut thread_rng());
 
-        // 1st step: party A generate t_one and t_two, and sends to party B
-        secp.bullet_proof_multisig(
-            value,
-            blinding1,
-            common_nonce,
-            None,
-            None,
-            None,
-            Some(&mut t_one),
-            Some(&mut t_two),
-            commits.clone(),
-            Some(&private_nonce1),
-            false,
-        );
+		let private_nonce_a = SecretKey::new(&secp, &mut thread_rng());
+		let private_nonce_b = SecretKey::new(&secp, &mut thread_rng());
 
-	// 2nd step: party B use t_one and t_two from party A to generate tau_x, and sends it to party A,
-	//   also generate new t_one and t_two and send to party A.
+		// 1st step on party A: generate t_one and t_two, and sends to party B
+		let mut t_one_a = PublicKey::new();
+		let mut t_two_a = PublicKey::new();
+		secp.bullet_proof_multisig(
+			value,
+			blinding_a,
+			common_nonce,
+			None,
+			None,
+			None,
+			Some(&mut t_one_a),
+			Some(&mut t_two_a),
+			commits.clone(),
+			Some(&private_nonce_a),
+			false,
+		);
 
-	let mut tau_x = SecretKey::new(&secp, &mut thread_rng());
-	secp.bullet_proof_multisig(
-		value,
-		blinding2,
-		common_nonce,
-		None,
-		None,
-		Some(&mut tau_x),
-		Some(&mut t_one),
-		Some(&mut t_two),
-		commits.clone(),
-		Some(&private_nonce2),
-		false,
-	);
+		// 1st step on party B: generate t_one and t_two, and sends to party A
+		let mut t_one_b = PublicKey::new();
+		let mut t_two_b = PublicKey::new();
+		secp.bullet_proof_multisig(
+			value,
+			blinding_b,
+			common_nonce,
+			None,
+			None,
+			None,
+			Some(&mut t_one_b),
+			Some(&mut t_two_b),
+			commits.clone(),
+			Some(&private_nonce_b),
+			false,
+		);
 
-	// 3rd step: party A finalizes bulletproof with input tau_x, t_one, t_two from party B.
-	let bullet_proof = secp.bullet_proof_multisig(
-		value,
-		blinding1,
-		common_nonce,
-		None,
-		None,
-		Some(&mut tau_x),
-		Some(&mut t_one),
-		Some(&mut t_two),
-		commits.clone(),
-		Some(&private_nonce1),
-		true,
-	).unwrap();
+		// 1st step on both party A and party B: sum up both t_one and both t_two.
+		let mut pubkeys = vec![];
+		pubkeys.push(&t_one_a);
+		pubkeys.push(&t_one_b);
+		let mut t_one_sum = PublicKey::from_combination(&secp, pubkeys.clone()).unwrap();
 
-        // correct verification
-        println!("MultiSig Bullet proof: {:?}", bullet_proof);
-	let commit = secp.commit_sum(commits, vec![]).unwrap();
-        let proof_range = secp.verify_bullet_proof(commit, bullet_proof, None).unwrap();
-        assert_eq!(proof_range.min, 0);
+		pubkeys.clear();
+		pubkeys.push(&t_two_a);
+		pubkeys.push(&t_two_b);
+		let mut t_two_sum = PublicKey::from_combination(&secp, pubkeys.clone()).unwrap();
 
-	//TODO:
-    }
+		// 2nd step on party A: use t_one_sum and t_two_sum to generate tau_x, and sent to party B.
+		let mut tau_x_a = SecretKey::new(&secp, &mut thread_rng());
+		secp.bullet_proof_multisig(
+			value,
+			blinding_a,
+			common_nonce,
+			None,
+			None,
+			Some(&mut tau_x_a),
+			Some(&mut t_one_sum),
+			Some(&mut t_two_sum),
+			commits.clone(),
+			Some(&private_nonce_a),
+			false,
+		);
+
+		// 2nd step on party B: use t_one_sum and t_two_sum to generate tau_x, and send to party A.
+		let mut tau_x_b = SecretKey::new(&secp, &mut thread_rng());
+		secp.bullet_proof_multisig(
+			value,
+			blinding_b,
+			common_nonce,
+			None,
+			None,
+			Some(&mut tau_x_b),
+			Some(&mut t_one_sum),
+			Some(&mut t_two_sum),
+			commits.clone(),
+			Some(&private_nonce_b),
+			false,
+		);
+
+		// 2nd step on both party A and B: sum up both tau_x
+		let mut tau_x_sum = tau_x_a;
+		tau_x_sum.add_assign(&secp, &tau_x_b).unwrap();
+
+		// 3rd step: party A finalizes bulletproof with input tau_x, t_one, t_two.
+		let bullet_proof = secp
+			.bullet_proof_multisig(
+				value,
+				blinding_a,
+				common_nonce,
+				None,
+				None,
+				Some(&mut tau_x_sum),
+				Some(&mut t_one_sum),
+				Some(&mut t_two_sum),
+				commits.clone(),
+				Some(&private_nonce_a),
+				true,
+			).unwrap();
+
+		// correct verification
+		println!("MultiSig Bullet proof: {:?}", bullet_proof);
+		let proof_range = secp
+			.verify_bullet_proof(commit, bullet_proof, None)
+			.unwrap();
+		assert_eq!(proof_range.min, 0);
+
+		//TODO:
+	}
 
 	#[test]
 	fn rewind_message() {
