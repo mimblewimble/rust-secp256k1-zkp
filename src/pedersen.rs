@@ -28,7 +28,7 @@ use Secp256k1;
 
 use constants;
 use ffi;
-use key::{self, SecretKey};
+use key::{self, SecretKey, PublicKey};
 use super::{Message, Signature};
 use rand::{Rng, prelude::thread_rng};
 use serde::{ser, de};
@@ -694,6 +694,111 @@ impl Secp256k1 {
 		}
 	}
 
+    /// Produces a bullet proof for multi-party commitment
+    pub fn bullet_proof_multisig(
+        &self,
+        value: u64,
+        blind: SecretKey,
+        nonce: SecretKey,
+        extra_data: Option<Vec<u8>>,
+        message: Option<ProofMessage>,
+        tau_x: Option<&mut SecretKey>,
+        t_one:Option<&mut PublicKey>,
+        t_two:Option<&mut PublicKey>,
+        commits: Vec<Commitment>,
+        private_nonce: Option<&SecretKey>,
+	last_step: bool,
+    ) -> Option<RangeProof> {
+        let mut proof = [0; constants::MAX_PROOF_SIZE];
+        let mut plen = constants::MAX_PROOF_SIZE as size_t;
+
+        let blind_vec:Vec<SecretKey> = vec![blind];
+        let blind_vec = map_vec!(blind_vec, |p| p.0.as_ptr());
+        let n_bits = 64;
+
+        let (extra_data_len, extra_data) = match extra_data {
+            Some(d) => (d.len(), d),
+            None => (0, vec![]),
+        };
+
+        let message_ptr = match message {
+            Some(mut m) => {
+                while m.len() < constants::BULLET_PROOF_MSG_SIZE {
+                    m.push(0u8);
+                }
+                m.truncate(constants::BULLET_PROOF_MSG_SIZE);
+                m.as_ptr()
+            },
+            None => ptr::null(),
+        };
+
+        let tau_x = match tau_x {
+            Some(mut n) => n.0.as_mut_ptr(),
+            None => ptr::null_mut(),
+        };
+
+        let t_one = match t_one {
+            Some(mut n) => n.as_mut_ptr(),
+            None => ptr::null_mut(),
+        };
+
+        let t_two = match t_two {
+            Some(mut n) => n.as_mut_ptr(),
+            None => ptr::null_mut(),
+        };
+
+        let commits = if commits.len() > 0 {
+            let commit_vec = map_vec!(commits, |c| c.0.as_ptr());
+            commit_vec.as_ptr()
+        } else {
+            ptr::null()
+        };
+
+        let private_nonce = match private_nonce {
+            Some(n) => n.as_ptr(),
+            None => ptr::null(),
+        };
+
+        let _success = unsafe {
+            let scratch = ffi::secp256k1_scratch_space_create(self.ctx, SCRATCH_SPACE_SIZE);
+            let result = ffi::secp256k1_bulletproof_rangeproof_prove(
+                self.ctx,
+                scratch,
+                shared_generators(self.ctx),
+                if last_step { proof.as_mut_ptr() } else { ptr::null_mut() },
+				if last_step { &mut plen } else { ptr::null_mut() },
+                tau_x,
+                t_one,
+                t_two,
+                &value,
+                ptr::null(),	// min_values: NULL for all-zeroes minimum values to prove ranges above
+                blind_vec.as_ptr(),
+                commits,
+                1,
+                constants::GENERATOR_H.as_ptr(),
+                n_bits as size_t,
+                nonce.as_ptr(),
+                private_nonce,
+                extra_data.as_ptr(),
+                extra_data_len as size_t,
+                message_ptr,
+            );
+
+            ffi::secp256k1_scratch_space_destroy(scratch);
+
+            result == 1
+        };
+
+		if last_step {
+			Some(RangeProof {
+				proof: proof,
+				plen: plen as usize,
+			})
+		} else {
+			None
+		}
+    }
+
 	/// Verify with bullet proof that a committed value is positive
 	pub fn verify_bullet_proof(
 		&self,
@@ -887,7 +992,7 @@ mod tests {
     extern crate chrono;
     use super::{Commitment, RangeProof, ProofMessage, Message, Secp256k1};
     use ContextFlag;
-    use key::{ONE_KEY, ZERO_KEY, SecretKey};
+    use key::{ONE_KEY, ZERO_KEY, SecretKey, PublicKey};
 
     use rand::{Rng, prelude::thread_rng};
 
@@ -1170,6 +1275,84 @@ mod tests {
 		assert_eq!(proof_info.message, message);
 
 	}
+
+    #[test]
+    fn test_bullet_proof_multisig() {
+        // Test Bulletproofs multisig without message
+        let secp = Secp256k1::with_caps(ContextFlag::Commit);
+        let blinding1 = SecretKey::new(&secp, &mut thread_rng());
+        let value = 12345678;
+        let mut commits = vec![];
+        let partial_commit1 = secp.commit(value, blinding1).unwrap();
+        commits.push(partial_commit1);
+
+        let blinding2 = SecretKey::new(&secp, &mut thread_rng());
+        let partial_commit2 = secp.commit(0, blinding2).unwrap();
+        commits.push(partial_commit2);
+
+	let common_nonce = SecretKey::new(&secp, &mut thread_rng());
+
+	let private_nonce1 = SecretKey::new(&secp, &mut thread_rng());
+	let private_nonce2 = SecretKey::new(&secp, &mut thread_rng());
+        let mut t_one = PublicKey::new();
+        let mut t_two = PublicKey::new();
+
+        // 1st step: party A generate t_one and t_two, and sends to party B
+        secp.bullet_proof_multisig(
+            value,
+            blinding1,
+            common_nonce,
+            None,
+            None,
+            None,
+            Some(&mut t_one),
+            Some(&mut t_two),
+            commits.clone(),
+            Some(&private_nonce1),
+            false,
+        );
+
+	// 2nd step: party B use t_one and t_two from party A to generate tau_x, and sends it to party A,
+	//   also generate new t_one and t_two and send to party A.
+
+	let mut tau_x = SecretKey::new(&secp, &mut thread_rng());
+	secp.bullet_proof_multisig(
+		value,
+		blinding2,
+		common_nonce,
+		None,
+		None,
+		Some(&mut tau_x),
+		Some(&mut t_one),
+		Some(&mut t_two),
+		commits.clone(),
+		Some(&private_nonce2),
+		false,
+	);
+
+	// 3rd step: party A finalizes bulletproof with input tau_x, t_one, t_two from party B.
+	let bullet_proof = secp.bullet_proof_multisig(
+		value,
+		blinding1,
+		common_nonce,
+		None,
+		None,
+		Some(&mut tau_x),
+		Some(&mut t_one),
+		Some(&mut t_two),
+		commits.clone(),
+		Some(&private_nonce1),
+		true,
+	).unwrap();
+
+        // correct verification
+        println!("MultiSig Bullet proof: {:?}", bullet_proof);
+	let commit = secp.commit_sum(commits, vec![]).unwrap();
+        let proof_range = secp.verify_bullet_proof(commit, bullet_proof, None).unwrap();
+        assert_eq!(proof_range.min, 0);
+
+	//TODO:
+    }
 
 	#[test]
 	fn rewind_message() {
