@@ -143,7 +143,7 @@ macro_rules! impl_array_newtype {
                             use std::mem;
                             let mut ret: [$ty; $len] = mem::uninitialized();
                             for i in 0..len {
-                                ret[i] = try!(d.read_seq_elt(i, |d| Decodable::decode(d)));
+                                ret[i] = d.read_seq_elt(i, |d| Decodable::decode(d))?;
                             }
                             Ok($thing(ret))
                         }
@@ -180,12 +180,12 @@ macro_rules! impl_array_newtype {
                             use std::mem;
                             let mut ret: [$ty; $len] = mem::uninitialized();
                             for i in 0..$len {
-                                ret[i] = match try!(a.next_element()) {
+                                ret[i] = match a.next_element()? {
                                     Some(c) => c,
                                     None => return Err(::serde::de::Error::invalid_length(i, &self))
                                 };
                             }
-                            let one_after_last : Option<u8> = try!(a.next_element());
+                            let one_after_last : Option<u8> = a.next_element()?;
                             if one_after_last.is_some() {
                                 return Err(::serde::de::Error::invalid_length($len + 1, &self));
                             }
