@@ -57,7 +57,7 @@ pub struct PublicKey(pub ffi::PublicKey);
 
 fn random_32_bytes<R: Rng>(rng: &mut R) -> [u8; 32] {
     let mut ret = [0u8; 32];
-    rng.fill_bytes(&mut ret);
+    rng.fill(&mut ret);
     ret
 }
 
@@ -374,7 +374,7 @@ mod test {
     use super::{PublicKey, SecretKey};
     use super::super::constants;
 
-    use rand::{Error, RngCore, prelude::thread_rng};
+    use rand::{Error, RngCore, thread_rng};
     use self::rand_core::impls;
 
     #[test]
