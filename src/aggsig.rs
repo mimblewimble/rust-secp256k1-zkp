@@ -142,7 +142,7 @@ pub fn verify_single(secp: &Secp256k1, sig:&Signature, msg:&Message, pubnonce:Op
         false => 0,
     };
 
-    if (sig.0).0.ends_with(&ZERO_256) || (pubkey.0).0.starts_with(&ZERO_256) {
+    if (sig.0).0.starts_with(&ZERO_256) || (pubkey.0).0.starts_with(&ZERO_256) {
         return false;
     }
 
