@@ -260,12 +260,12 @@ impl<'de> serde::Deserialize<'de> for Signature {
                     let mut ret: [u8; constants::COMPACT_SIGNATURE_SIZE] = mem::uninitialized();
 
                     for i in 0..constants::COMPACT_SIGNATURE_SIZE {
-                        ret[i] = match try!(a.next_element()) {
+                        ret[i] = match a.next_element()? {
                             Some(c) => c,
                             None => return Err(::serde::de::Error::invalid_length(i, &self))
                         };
                     }
-                    let one_after_last : Option<u8> = try!(a.next_element());
+                    let one_after_last : Option<u8> = a.next_element()?;
                     if one_after_last.is_some() {
                         return Err(serde::de::Error::invalid_length(constants::COMPACT_SIGNATURE_SIZE + 1, &self));
                     }
@@ -607,7 +607,7 @@ impl Secp256k1 {
     pub fn generate_keypair<R: Rng>(&self, rng: &mut R)
                                    -> Result<(key::SecretKey, key::PublicKey), Error> {
         let sk = key::SecretKey::new(self, rng);
-        let pk = try!(key::PublicKey::from_secret_key(self, &sk));
+        let pk = key::PublicKey::from_secret_key(self, &sk)?;
         Ok((sk, pk))
     }
 
