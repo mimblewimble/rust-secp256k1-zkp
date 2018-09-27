@@ -30,7 +30,7 @@ use constants;
 use ffi;
 use key::{self, SecretKey, PublicKey};
 use super::{Message, Signature};
-use rand::{Rng, prelude::thread_rng};
+use rand::{Rng, thread_rng};
 use serde::{ser, de};
 
 const MAX_WIDTH:usize = 1 << 20;
@@ -252,9 +252,9 @@ impl ::std::cmp::Eq for ProofMessage {}
 
 impl ::std::fmt::Debug for ProofMessage {
 	fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
-		try!(write!(f, "{}(", stringify!(ProofMessage)));
+		write!(f, "{}(", stringify!(ProofMessage))?;
 		for i in self.0.iter().cloned() {
-			try!(write!(f, "{:02x}", i));
+			write!(f, "{:02x}", i)?;
 		}
 		write!(f, ")")
 	}
@@ -296,9 +296,9 @@ pub struct ProofInfo {
 
 impl ::std::fmt::Debug for RangeProof {
 	fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
-		try!(write!(f, "{}(", stringify!(RangeProof)));
+		write!(f, "{}(", stringify!(RangeProof))?;
 		for i in self.proof[..self.plen].iter().cloned() {
-			try!(write!(f, "{:02x}", i));
+			write!(f, "{:02x}", i)?;
 		}
 		write!(f, ")[{}]", self.plen)
 	}
@@ -994,7 +994,7 @@ mod tests {
     use ContextFlag;
     use key::{ONE_KEY, ZERO_KEY, SecretKey, PublicKey};
 
-    use rand::{Rng, prelude::thread_rng};
+    use rand::{Rng, thread_rng};
 
     use pedersen::tests::chrono::prelude::*;
 

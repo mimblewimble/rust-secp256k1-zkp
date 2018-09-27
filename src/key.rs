@@ -57,7 +57,7 @@ pub struct PublicKey(pub ffi::PublicKey);
 
 fn random_32_bytes<R: Rng>(rng: &mut R) -> [u8; 32] {
     let mut ret = [0u8; 32];
-    rng.fill_bytes(&mut ret);
+    rng.fill(&mut ret);
     ret
 }
 
@@ -267,7 +267,7 @@ impl Decodable for PublicKey {
                     use std::mem;
                     let mut ret: [u8; constants::UNCOMPRESSED_PUBLIC_KEY_SIZE] = mem::uninitialized();
                     for i in 0..len {
-                        ret[i] = try!(d.read_seq_elt(i, |d| Decodable::decode(d)));
+                        ret[i] = d.read_seq_elt(i, |d| Decodable::decode(d))?;
                     }
                     PublicKey::from_slice(&s, &ret).map_err(|_| d.error("invalid public key"))
                 }
@@ -276,7 +276,7 @@ impl Decodable for PublicKey {
                     use std::mem;
                     let mut ret: [u8; constants::COMPRESSED_PUBLIC_KEY_SIZE] = mem::uninitialized();
                     for i in 0..len {
-                        ret[i] = try!(d.read_seq_elt(i, |d| Decodable::decode(d)));
+                        ret[i] = d.read_seq_elt(i, |d| Decodable::decode(d))?;
                     }
                     PublicKey::from_slice(&s, &ret).map_err(|_| d.error("invalid public key"))
                 }
@@ -327,14 +327,14 @@ impl<'de> Deserialize<'de> for PublicKey {
 
                     let mut read_len = 0;
                     while read_len < constants::UNCOMPRESSED_PUBLIC_KEY_SIZE {
-                        let read_ch = match try!(a.next_element()) {
+                        let read_ch = match a.next_element()? {
                             Some(c) => c,
                             None => break
                         };
                         ret[read_len] = read_ch;
                         read_len += 1;
                     }
-                    let one_after_last : Option<u8> = try!(a.next_element());
+                    let one_after_last : Option<u8> = a.next_element()?;
                     if one_after_last.is_some() {
                         return Err(de::Error::invalid_length(read_len + 1, &self));
                     }
@@ -380,7 +380,7 @@ mod test {
     use super::{PublicKey, SecretKey};
     use super::super::constants;
 
-    use rand::{Error, RngCore, prelude::thread_rng};
+    use rand::{Error, RngCore, thread_rng};
     use self::rand_core::impls;
 
     #[test]
