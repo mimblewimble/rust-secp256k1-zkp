@@ -161,6 +161,12 @@ impl PublicKey {
         &self.0 as *const _
     }
 
+    /// Obtains a mutable raw pointer suitable for use with FFI functions
+    #[inline]
+    pub fn as_mut_ptr(&mut self) -> *mut ffi::PublicKey {
+        &mut self.0 as *mut _
+    }
+
     /// Creates a new public key from a Secp256k1 public key
     #[inline]
     pub fn from_secp256k1_pubkey(pk: ffi::PublicKey) -> PublicKey { PublicKey(pk) }

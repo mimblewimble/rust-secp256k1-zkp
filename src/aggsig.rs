@@ -25,7 +25,7 @@ use key::{SecretKey, PublicKey};
 use std::ptr;
 
 /// The 256 bits 0
-const ZERO_256: [u8; 32] = [0, 0, 0, 0, 0, 0, 0, 0,
+pub const ZERO_256: [u8; 32] = [0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0];
