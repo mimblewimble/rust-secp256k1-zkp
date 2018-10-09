@@ -68,8 +68,8 @@ pub type NonceFn = unsafe extern "C" fn(nonce32: *mut c_uchar,
 
 /// Generator
 #[repr(C)] 
-pub struct Generator(pub [c_uchar; 33]);
-impl_array_newtype!(Generator, c_uchar, 33);
+pub struct Generator(pub [c_uchar; 64]);
+impl_array_newtype!(Generator, c_uchar, 64);
 impl_raw_debug!(Generator);
 
 /// Library-internal representation of a Secp256k1 public key
@@ -362,6 +362,19 @@ extern "C" {
                           scalar: *const c_uchar)
                           -> c_int;
 
+  // Parse a 33-byte commitment into 64 byte internal commitment object
+  pub fn secp256k1_pedersen_commitment_parse(cx: *const Context,
+                                              commit: *mut c_uchar,
+                                              input: *const c_uchar)
+                                              -> c_int;
+
+  // Serialize a 64-byte commit object into a 33 byte serialized byte sequence
+  pub fn secp256k1_pedersen_commitment_serialize(cx: *const Context,
+                                                  output: *mut c_uchar,
+                                                  commit: *const c_uchar)
+                                                  -> c_int;
+
+
 	// Generates a pedersen commitment: *commit = blind * G + value * G2.
 	// The commitment is 33 bytes, the blinding factor is 32 bytes.
 	pub fn secp256k1_pedersen_commit(
@@ -389,7 +402,7 @@ extern "C" {
 		npositive: size_t
 	) -> c_int;
 
-	// Takes two list of 33-byte commitments and sums the first set, subtracts
+	// Takes two list of 64-byte commitments and sums the first set, subtracts
 	// the second and returns the resulting commitment.
 	pub fn secp256k1_pedersen_commit_sum(
 		ctx: *const Context,
@@ -400,7 +413,7 @@ extern "C" {
 		ncnt: size_t
 	) -> c_int;
 
-	// Takes two list of 33-byte commitments and sums the first set and
+	// Takes two list of 64-byte commitments and sums the first set and
 	// subtracts the second and verifies that they sum to 0.
 	pub fn secp256k1_pedersen_verify_tally(ctx: *const Context,
 		commits: *const *const c_uchar,
