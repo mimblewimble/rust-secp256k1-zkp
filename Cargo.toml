@@ -1,15 +1,15 @@
 [package]
 
-name = "secp256k1zkp"
+name = "grin_secp256k1zkp"
 version = "0.7.1"
-authors = [ "Dawid Ciężarkiewicz <dpc@ucore.info>",
+authors = [ "Grin Developers <mimblewimble@lists.launchpad.net>",
+						"Dawid Ciężarkiewicz <dpc@ucore.info>",
             "Andrew Poelstra <apoelstra@wpsoftware.net>" ]
 license = "CC0-1.0"
-homepage = "https://github.com/apoelstra/rust-secp256k1/"
-repository = "https://github.com/apoelstra/rust-secp256k1/"
-documentation = "https://www.wpsoftware.net/rustdoc/secp256k1/"
-description = "Rust bindings for Pieter Wuille's `libsecp256k1` library. Implements ECDSA for the SECG elliptic curve group secp256k1 and related utilities."
-keywords = [ "crypto", "ECDSA", "secp256k1", "libsecp256k1", "bitcoin" ]
+homepage = "https://grin-tech.org"
+repository = "https://github.com/mimblewimble/rust-secp256k1/"
+description = "Grin's fork with Zero-Knowledge extensions of Rust bindings for Pieter Wuille's `libsecp256k1` library. Implements ECDSA for the SECG elliptic curve group secp256k1 and related utilities."
+keywords = [ "crypto", "secp256k1", "grin", "bitcoin", "zero-knowledge" ]
 readme = "README.md"
 
 build = "build.rs"
