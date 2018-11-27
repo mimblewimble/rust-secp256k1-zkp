@@ -704,7 +704,7 @@ impl Secp256k1 {
 		value: u64,
 		blind: SecretKey,
 		nonce: SecretKey,
-		extra_data: Option<Vec<u8>>,
+		extra_data_in: Option<Vec<u8>>,
 		message: Option<ProofMessage>,
 	) -> RangeProof {
 		let mut proof = [0; constants::MAX_PROOF_SIZE];
@@ -714,9 +714,9 @@ impl Secp256k1 {
 		let blind_vec = map_vec!(blind_vec, |p| p.0.as_ptr());
 		let n_bits = 64;
 
-		let (extra_data_len, extra_data) = match extra_data {
-			Some(d) => (d.len(), d),
-			None => (0, vec![]),
+		let (extra_data_len, extra_data) = match extra_data_in {
+			Some(d) => (d.len(), d.as_ptr()),
+			None => (0, ptr::null()),
 		};
 
 		let message_ptr = match message {
@@ -757,7 +757,7 @@ impl Secp256k1 {
 				n_bits as size_t,
 				nonce.as_ptr(),
 				private_nonce,
-				extra_data.as_ptr(),
+				extra_data,
 				extra_data_len as size_t,
 				message_ptr,
 			);
@@ -780,7 +780,7 @@ impl Secp256k1 {
 		value: u64,
 		blind: SecretKey,
 		nonce: SecretKey,
-		extra_data: Option<Vec<u8>>,
+		extra_data_in: Option<Vec<u8>>,
 		message: Option<ProofMessage>,
 		tau_x: Option<&mut SecretKey>,
 		t_one: Option<&mut PublicKey>,
@@ -799,9 +799,9 @@ impl Secp256k1 {
 		let blind_vec = map_vec!(blind_vec, |p| p.0.as_ptr());
 		let n_bits = 64;
 
-		let (extra_data_len, extra_data) = match extra_data {
-			Some(d) => (d.len(), d),
-			None => (0, vec![]),
+		let (extra_data_len, extra_data) = match extra_data_in {
+			Some(d) => (d.len(), d.as_ptr()),
+			None => (0, ptr::null()),
 		};
 
 		let message_ptr = match message {
@@ -871,7 +871,7 @@ impl Secp256k1 {
 				n_bits as size_t,
 				nonce.as_ptr(),
 				private_nonce,
-				extra_data.as_ptr(),
+				extra_data,
 				extra_data_len as size_t,
 				message_ptr,
 			);
@@ -896,13 +896,13 @@ impl Secp256k1 {
 		&self,
 		commit: Commitment,
 		proof: RangeProof,
-		extra_data: Option<Vec<u8>>,
+		extra_data_in: Option<Vec<u8>>,
 	) -> Result<ProofRange, Error> {
 		let n_bits = 64;
 
-		let (extra_data_len, extra_data) = match extra_data {
-			Some(d) => (d.len(), d),
-			None => (0, vec![]),
+		let (extra_data_len, extra_data) = match extra_data_in {
+			Some(d) => (d.len(), d.as_ptr()),
+			None => (0, ptr::null()),
 		};
 
 		let commit = self.commit_parse(commit.0).unwrap();
@@ -920,7 +920,7 @@ impl Secp256k1 {
 				1,
 				n_bits as size_t,
 				constants::GENERATOR_H.as_ptr(),
-				extra_data.as_ptr(),
+				extra_data,
 				extra_data_len as size_t,
 			);
 			//			ffi::secp256k1_bulletproof_generators_destroy(self.ctx, gens);
@@ -982,7 +982,7 @@ impl Secp256k1 {
 				let extra_data_lengths = map_vec![ed, |d| d.len()];
 				(extra_data_vec, extra_data_lengths)
 			} else {
-				let extra_data_vec = vec![vec![].as_ptr(); proof_vec.len()];
+				let extra_data_vec = vec![ptr::null(); proof_vec.len()];
 				let extra_data_lengths = vec![0; proof_vec.len()];
 				(extra_data_vec, extra_data_lengths)
 			}
@@ -1025,12 +1025,12 @@ impl Secp256k1 {
 		&self,
 		commit: Commitment,
 		nonce: SecretKey,
-		extra_data: Option<Vec<u8>>,
+		extra_data_in: Option<Vec<u8>>,
 		proof: RangeProof,
 	) -> Result<ProofInfo, Error> {
-		let extra_data = match extra_data {
-			Some(d) => d,
-			None => vec![],
+		let (extra_data_len, extra_data) = match extra_data_in {
+			Some(d) => (d.len(), d.as_ptr()),
+			None => (0, ptr::null()),
 		};
 
 		let mut blind_out = [0u8; constants::SECRET_KEY_SIZE];
@@ -1051,8 +1051,8 @@ impl Secp256k1 {
 				commit.as_ptr(),
 				constants::GENERATOR_H.as_ptr(),
 				nonce.as_ptr(),
-				extra_data.as_ptr(),
-				extra_data.len() as size_t,
+				extra_data,
+				extra_data_len as size_t,
 				message_out.as_mut_ptr(),
 			);
 			//			ffi::secp256k1_bulletproof_generators_destroy(self.ctx, gens);
