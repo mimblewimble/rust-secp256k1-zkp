@@ -420,8 +420,8 @@ extern "C" {
         blind: *const c_uchar,
         value: uint64_t,
         value_gen: *const c_uchar,
-		blind_gen: *const c_uchar,
-        switch_pubkey_raw: *const c_uchar
+        blind_gen: *const c_uchar,
+        switch_pubkey: *const c_uchar
     ) -> c_int;
 
 	// Takes two list of 64-byte commitments and sums the first set and
