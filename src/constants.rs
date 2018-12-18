@@ -100,7 +100,15 @@ pub const GENERATOR_H : [u8;64] = [
     0xc3, 0x0c, 0x23, 0x13, 0xf3, 0xa3, 0x89, 0x04
 ];
 
-pub const GENERATOR_PUB_J : [u8;64] = [
+/// Raw bytes for generator J as public key
+/// This is the sha256 of the sha256 of 'g' after DER encoding (without compression),
+/// which happens to be a point on the curve.
+/// sage: gen_h =  hashlib.sha256('0479be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8'.decode('hex'))
+/// sage: gen_j_input = gen_h.hexdigest()
+/// sage: gen_j =  hashlib.sha256(gen_j_input.decode('hex'))
+/// sage: G3 = EllipticCurve ([F (0), F (7)]).lift_x(int(gen_j.hexdigest(),16))
+/// sage: '%x %x'%G3.xy()
+pub const GENERATOR_PUB_J_RAW : [u8;64] = [
     0x5f, 0x15, 0x21, 0x36, 0x93, 0x93, 0x01, 0x2a,
     0x8d, 0x8b, 0x39, 0x7e, 0x9b, 0xf4, 0x54, 0x29,
     0x2f, 0x5a, 0x1b, 0x3d, 0x38, 0x85, 0x16, 0xc2,

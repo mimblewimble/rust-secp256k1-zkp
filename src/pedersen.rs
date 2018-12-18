@@ -523,7 +523,7 @@ impl Secp256k1 {
 					value,
 					constants::GENERATOR_H.as_ptr(),
 					constants::GENERATOR_G.as_ptr(),
-					constants::GENERATOR_PUB_J.as_ptr(),
+					constants::GENERATOR_PUB_J_RAW.as_ptr(),
 				),
 				1
 			)
