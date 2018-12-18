@@ -509,6 +509,7 @@ impl Secp256k1 {
 		SecretKey::from_slice(self, &ret)
 	}
 
+	/// Compute a blinding factor using a switch commitment
 	pub fn blind_switch(&self, value: u64, blind: SecretKey) -> Result<SecretKey, Error> {
 		if self.caps != ContextFlag::Commit {
 			return Err(Error::IncapableContext);
@@ -1202,6 +1203,31 @@ mod tests {
 		assert!(secp.verify_commit_sum(
 			vec![commit(101, blind_pos)],
 			vec![commit(75, blind_neg), commit(26, blind_sum)],
+		));
+	}
+
+	#[test]
+	fn test_verify_commit_sum_random_keys_switch() {
+		let secp = Secp256k1::with_caps(ContextFlag::Commit);
+
+		fn commit(value: u64, blinding: SecretKey) -> Commitment {
+			let secp = Secp256k1::with_caps(ContextFlag::Commit);
+			secp.commit(value, blinding).unwrap()
+		}
+
+		let pos_value = 101;
+		let neg_value = 75;
+
+		let blind_pos = secp.blind_switch(pos_value, SecretKey::new(&secp, &mut thread_rng())).unwrap();
+		let blind_neg = secp.blind_switch(neg_value, SecretKey::new(&secp, &mut thread_rng())).unwrap();
+
+		// now construct blinding factor to net out appropriately
+		let blind_sum = secp.blind_sum(vec![blind_pos], vec![blind_neg]).unwrap();
+		let diff = pos_value - neg_value;
+
+		assert!(secp.verify_commit_sum(
+			vec![commit(pos_value, blind_pos)],
+			vec![commit(neg_value, blind_neg), commit(diff, blind_sum)],
 		));
 	}
 
