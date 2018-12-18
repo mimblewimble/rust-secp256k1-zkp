@@ -509,6 +509,28 @@ impl Secp256k1 {
 		SecretKey::from_slice(self, &ret)
 	}
 
+	pub fn blind_switch(&self, value: u64, blind: SecretKey) -> Result<SecretKey, Error> {
+		if self.caps != ContextFlag::Commit {
+			return Err(Error::IncapableContext);
+		}
+		let mut ret: [u8; 32] = unsafe { mem::uninitialized() };
+		unsafe {
+			assert_eq!(
+				ffi::secp256k1_blind_switch(
+					self.ctx,
+					ret.as_mut_ptr(),
+					blind.as_ptr(),
+					value,
+					constants::GENERATOR_H.as_ptr(),
+					constants::GENERATOR_G.as_ptr(),
+					constants::GENERATOR_PUB_J_RAW.as_ptr(),
+				),
+				1
+			)
+		}
+		SecretKey::from_slice(self, &ret)
+	}
+
 	/// Convenience function for generating a random nonce for a range proof.
 	/// We will need the nonce later if we want to rewind the range proof.
 	pub fn nonce(&self) -> [u8; 32] {

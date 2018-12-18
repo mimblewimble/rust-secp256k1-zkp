@@ -413,6 +413,17 @@ extern "C" {
 		ncnt: size_t
 	) -> c_int;
 
+    // Calculate blinding factor for switch commitment x + H(xG+vH | xJ)
+    pub fn secp256k1_blind_switch(
+        ctx: *const Context,
+        blind_switch: *mut c_uchar,
+        blind: *const c_uchar,
+        value: uint64_t,
+        value_gen: *const c_uchar,
+        blind_gen: *const c_uchar,
+        switch_pubkey: *const c_uchar
+    ) -> c_int;
+
 	// Takes two list of 64-byte commitments and sums the first set and
 	// subtracts the second and verifies that they sum to 0.
 	pub fn secp256k1_pedersen_verify_tally(ctx: *const Context,
