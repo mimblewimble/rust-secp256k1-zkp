@@ -737,23 +737,20 @@ impl Secp256k1 {
 		let blind_vec = map_vec!(blind_vec, |p| p.0.as_ptr());
 		let n_bits = 64;
 
-		let (extra_data_len, extra_data) = match extra_data_in {
+		let (extra_data_len, extra_data) = match extra_data_in.as_ref() {
 			Some(d) => (d.len(), d.as_ptr()),
 			None => (0, ptr::null()),
 		};
 
-		let message_out = match message.clone() {
-			Some(mut m) => {
+		let mut message = message;
+		let message_ptr = match message.as_mut() {
+			Some(m) => {
 				while m.len() < constants::BULLET_PROOF_MSG_SIZE {
 					m.push(0u8);
 				}
 				m.truncate(constants::BULLET_PROOF_MSG_SIZE);
-				m
-			}
-			None => ProofMessage::from_bytes(&[0u8; constants::BULLET_PROOF_MSG_SIZE]),
-		};
-		let message_ptr = match message {
-			Some(_) => message_out.as_ptr(),
+				m.as_ptr()
+			},
 			None => ptr::null(),
 		};
 
@@ -826,23 +823,20 @@ impl Secp256k1 {
 		let blind_vec = map_vec!(blind_vec, |p| p.0.as_ptr());
 		let n_bits = 64;
 
-		let (extra_data_len, extra_data) = match extra_data_in {
+		let (extra_data_len, extra_data) = match extra_data_in.as_ref() {
 			Some(d) => (d.len(), d.as_ptr()),
 			None => (0, ptr::null()),
 		};
 
-		let message_out = match message.clone() {
-			Some(mut m) => {
+		let mut message = message;
+		let message_ptr = match message.as_mut() {
+			Some(m) => {
 				while m.len() < constants::BULLET_PROOF_MSG_SIZE {
 					m.push(0u8);
 				}
 				m.truncate(constants::BULLET_PROOF_MSG_SIZE);
-				m
-			}
-			None => ProofMessage::from_bytes(&[0u8; constants::BULLET_PROOF_MSG_SIZE]),
-		};
-		let message_ptr = match message {
-			Some(_) => message_out.as_ptr(),
+				m.as_ptr()
+			},
 			None => ptr::null(),
 		};
 
@@ -861,10 +855,12 @@ impl Secp256k1 {
 			t_two_ptr = is_zero_pubkey!(retnone => t_two);
 		};
 
-		let commits = if commits.len() > 0 {
-			let commit_vec = map_vec!(commits, |c| self.commit_parse(c.0).unwrap());
-			let commit_vec = map_vec!(commit_vec, |c| c.as_ptr());
-			commit_vec.as_ptr()
+		let commit_vec;
+		let commit_ptr_vec;
+		let commit_ptr_vec_ptr = if commits.len() > 0 {
+			commit_vec = map_vec!(commits, |c| self.commit_parse(c.0).unwrap());
+			commit_ptr_vec = map_vec!(commit_vec, |c| c.as_ptr());
+			commit_ptr_vec.as_ptr()
 		} else {
 			ptr::null()
 		};
@@ -896,7 +892,7 @@ impl Secp256k1 {
 				&value,
 				ptr::null(), // min_values: NULL for all-zeroes minimum values to prove ranges above
 				blind_vec.as_ptr(),
-				commits,
+				commit_ptr_vec_ptr,
 				1,
 				constants::GENERATOR_H.as_ptr(),
 				n_bits as size_t,
@@ -931,8 +927,12 @@ impl Secp256k1 {
 	) -> Result<ProofRange, Error> {
 		let n_bits = 64;
 
+		let extra_data;
 		let (extra_data_len, extra_data) = match extra_data_in {
-			Some(d) => (d.len(), d.as_ptr()),
+			Some(d) => {
+				extra_data = d;
+				(extra_data.len(), extra_data.as_ptr())
+			},
 			None => (0, ptr::null()),
 		};
 
@@ -1006,13 +1006,13 @@ impl Secp256k1 {
 		};
 
 		// converting vec of vecs to expected pointer
-		let (extra_data_vec, extra_data_lengths) = {
-			if extra_data_in.is_some() {
-				let ed = extra_data_in.unwrap();
+		let (extra_data_vec, extra_data_lengths) = match extra_data_in.as_ref() {
+			Some(ed) => {
 				let extra_data_vec = map_vec!(ed, |d| d.as_ptr());
 				let extra_data_lengths = map_vec![ed, |d| d.len()];
 				(extra_data_vec, extra_data_lengths)
-			} else {
+			}
+			None => {
 				let extra_data_vec = vec![ptr::null(); proof_vec.len()];
 				let extra_data_lengths = vec![0; proof_vec.len()];
 				(extra_data_vec, extra_data_lengths)
@@ -1059,7 +1059,7 @@ impl Secp256k1 {
 		extra_data_in: Option<Vec<u8>>,
 		proof: RangeProof,
 	) -> Result<ProofInfo, Error> {
-		let (extra_data_len, extra_data) = match extra_data_in {
+		let (extra_data_len, extra_data) = match extra_data_in.as_ref() {
 			Some(d) => (d.len(), d.as_ptr()),
 			None => (0, ptr::null()),
 		};
@@ -1349,7 +1349,7 @@ mod tests {
 	}
 
 	#[test]
-	fn test_bullet_proof() {
+	fn test_bullet_proof_single() {
 		// Test Bulletproofs without message
 		let secp = Secp256k1::with_caps(ContextFlag::Commit);
 		let blinding = SecretKey::new(&secp, &mut thread_rng());
