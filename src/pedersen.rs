@@ -742,14 +742,18 @@ impl Secp256k1 {
 			None => (0, ptr::null()),
 		};
 
-		let message_ptr = match message {
+		let message_out = match message.clone() {
 			Some(mut m) => {
 				while m.len() < constants::BULLET_PROOF_MSG_SIZE {
 					m.push(0u8);
 				}
 				m.truncate(constants::BULLET_PROOF_MSG_SIZE);
-				m.as_ptr()
+				m
 			}
+			None => ProofMessage::from_bytes(&[0u8; constants::BULLET_PROOF_MSG_SIZE]),
+		};
+		let message_ptr = match message {
+			Some(_) => message_out.as_ptr(),
 			None => ptr::null(),
 		};
 
@@ -827,14 +831,18 @@ impl Secp256k1 {
 			None => (0, ptr::null()),
 		};
 
-		let message_ptr = match message {
+		let message_out = match message.clone() {
 			Some(mut m) => {
 				while m.len() < constants::BULLET_PROOF_MSG_SIZE {
 					m.push(0u8);
 				}
 				m.truncate(constants::BULLET_PROOF_MSG_SIZE);
-				m.as_ptr()
+				m
 			}
+			None => ProofMessage::from_bytes(&[0u8; constants::BULLET_PROOF_MSG_SIZE]),
+		};
+		let message_ptr = match message {
+			Some(_) => message_out.as_ptr(),
 			None => ptr::null(),
 		};
 
@@ -1107,6 +1115,7 @@ mod tests {
 	use super::{Commitment, Error, Message, ProofMessage, ProofRange, RangeProof, Secp256k1};
 	use key::{PublicKey, SecretKey, ONE_KEY, ZERO_KEY};
 	use ContextFlag;
+	use constants;
 
 	use rand::{thread_rng, Rng};
 
@@ -1734,6 +1743,26 @@ mod tests {
 			).unwrap();
 		assert_eq!(proof_info.message, message);
 		*/	}
+
+	#[test]
+	fn rewind_empty_message() {
+		let secp = Secp256k1::with_caps(ContextFlag::Commit);
+		let blinding = SecretKey::new(&secp, &mut thread_rng());
+		let nonce = SecretKey::new(&secp, &mut thread_rng());
+		let value = <u64>::max_value() - 1;
+		let commit = secp.commit(value, blinding).unwrap();
+
+		let mut pm = ProofMessage::from_bytes(&[0u8;32]);
+		let bullet_proof = secp.bullet_proof(value, blinding, nonce, None, Some(pm.clone()));
+		// Unwind message with same blinding factor
+		let proof_info = secp
+			.rewind_bullet_proof(commit, nonce, None, bullet_proof)
+			.unwrap();
+		assert_eq!(proof_info.value, value);
+		assert_eq!(blinding, proof_info.blinding);
+		pm.truncate(constants::BULLET_PROOF_MSG_SIZE);
+		assert_eq!(pm, proof_info.message);
+	}
 
 	#[test]
 	fn rewind_message() {
