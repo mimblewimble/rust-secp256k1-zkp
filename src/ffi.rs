@@ -356,9 +356,13 @@ extern "C" {
                                        n: c_int)
                                        -> c_int;
 
-    pub fn secp256k1_ec_privkey_tweak_inverse(cx: *const Context,
-                                              sk: *mut c_uchar)
-                                              -> c_int;
+    pub fn secp256k1_ec_privkey_tweak_inv(cx: *const Context,
+                                          sk: *mut c_uchar)
+                                          -> c_int;
+
+    pub fn secp256k1_ec_privkey_tweak_neg(cx: *const Context,
+                                          sk: *mut c_uchar)
+                                          -> c_int;
 
     pub fn secp256k1_ecdh(cx: *const Context,
                           out: *mut SharedSecret,

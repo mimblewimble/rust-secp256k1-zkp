@@ -124,7 +124,20 @@ impl SecretKey {
     pub fn inv_assign(&mut self, secp: &Secp256k1)
                      -> Result<(), Error> {
         unsafe {
-            if ffi::secp256k1_ec_privkey_tweak_inverse(secp.ctx, self.as_mut_ptr()) != 1 {
+            if ffi::secp256k1_ec_privkey_tweak_inv(secp.ctx, self.as_mut_ptr()) != 1 {
+                Err(InvalidSecretKey)
+            } else {
+                Ok(())
+            }
+        }
+    }
+
+    #[inline]
+    /// Negates the secret key
+    pub fn neg_assign(&mut self, secp: &Secp256k1)
+                     -> Result<(), Error> {
+        unsafe {
+            if ffi::secp256k1_ec_privkey_tweak_neg(secp.ctx, self.as_mut_ptr()) != 1 {
                 Err(InvalidSecretKey)
             } else {
                 Ok(())
@@ -773,13 +786,66 @@ mod test {
 
         let mut one_inv: SecretKey = one.clone();
         one_inv.inv_assign(&s).unwrap();
-        assert_eq!(one, one_inv);
+        assert_eq!(one_inv, one);
 
         let (sk1, _) = s.generate_keypair(&mut thread_rng()).unwrap();
-        let mut sk1_inv: SecretKey = sk1.clone();
-        sk1_inv.inv_assign(&s).unwrap();
-        sk1_inv.mul_assign(&s, &sk1).unwrap();
-        assert_eq!(sk1_inv, one);
+        let mut sk2: SecretKey = sk1.clone();
+        sk2.inv_assign(&s).unwrap();
+        sk2.inv_assign(&s).unwrap();
+        assert_eq!(sk2, sk1);
+
+        let (sk1, _) = s.generate_keypair(&mut thread_rng()).unwrap();
+        let mut sk2: SecretKey = sk1.clone();
+        sk2.inv_assign(&s).unwrap();
+        sk2.mul_assign(&s, &sk1).unwrap();
+        assert_eq!(sk2, one);
+    }
+
+    #[test]
+    fn test_negate() {
+        let s = Secp256k1::new();
+
+        let (sk1, _) = s.generate_keypair(&mut thread_rng()).unwrap();
+        let mut sk2: SecretKey = sk1.clone();
+        sk2.neg_assign(&s).unwrap();
+        assert!(sk2.add_assign(&s, &sk1).is_err());
+
+        let (sk1, _) = s.generate_keypair(&mut thread_rng()).unwrap();
+        let mut sk2: SecretKey = sk1.clone();
+        sk2.neg_assign(&s).unwrap();
+        sk2.neg_assign(&s).unwrap();
+        assert_eq!(sk2, sk1);
+
+        let (mut sk1, _) = s.generate_keypair(&mut thread_rng()).unwrap();
+        let mut sk2: SecretKey = sk1.clone();
+        sk1.neg_assign(&s).unwrap();
+        let sk1_clone = sk1.clone();
+        sk1.add_assign(&s, &sk1_clone).unwrap();
+        let sk2_clone = sk2.clone();
+        sk2.add_assign(&s, &sk2_clone).unwrap();
+        sk2.neg_assign(&s).unwrap();
+        assert_eq!(sk2, sk1);
+
+        let one = SecretKey::from_slice(&s, &[
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01]).unwrap();
+
+        let (mut sk1, _) = s.generate_keypair(&mut thread_rng()).unwrap();
+        let mut sk2: SecretKey = one.clone();
+        sk2.neg_assign(&s).unwrap();
+        sk2.mul_assign(&s, &sk1).unwrap();
+        sk1.neg_assign(&s).unwrap();
+        assert_eq!(sk2, sk1);
+
+        let (mut sk1, _) = s.generate_keypair(&mut thread_rng()).unwrap();
+        let mut sk2: SecretKey = sk1.clone();
+        sk1.neg_assign(&s).unwrap();
+        sk1.inv_assign(&s).unwrap();
+        sk2.inv_assign(&s).unwrap();
+        sk2.neg_assign(&s).unwrap();
+        assert_eq!(sk2, sk1);
     }
 
     #[test]
