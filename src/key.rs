@@ -118,6 +118,19 @@ impl SecretKey {
             }
         }
     }
+
+    #[inline]
+    /// Inverses the secret key
+    pub fn inv_assign(&mut self, secp: &Secp256k1)
+                     -> Result<(), Error> {
+        unsafe {
+            if ffi::secp256k1_ec_privkey_tweak_inverse(secp.ctx, self.as_mut_ptr()) != 1 {
+                Err(InvalidSecretKey)
+            } else {
+                Ok(())
+            }
+        }
+    }
 }
 
 impl PublicKey {
@@ -746,6 +759,27 @@ mod test {
         let _ = pk1.add_exp_assign(&s, &sk2);
         assert_eq!(combined_pk, pk2);
         assert_eq!(combined_pk, pk1);
+    }
+
+    #[test]
+    fn test_inverse() {
+        let s = Secp256k1::new();
+
+        let one = SecretKey::from_slice(&s, &[
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01]).unwrap();
+
+        let mut one_inv: SecretKey = one.clone();
+        one_inv.inv_assign(&s).unwrap();
+        assert_eq!(one, one_inv);
+
+        let (sk1, _) = s.generate_keypair(&mut thread_rng()).unwrap();
+        let mut sk1_inv: SecretKey = sk1.clone();
+        sk1_inv.inv_assign(&s).unwrap();
+        sk1_inv.mul_assign(&s, &sk1).unwrap();
+        assert_eq!(sk1_inv, one);
     }
 
     #[test]
