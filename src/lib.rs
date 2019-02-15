@@ -445,7 +445,7 @@ impl From<[u8; constants::MESSAGE_SIZE]> for Message {
 }
 
 /// An ECDSA error
-#[derive(Copy, PartialEq, Eq, Clone, Debug)]
+#[derive(Copy, PartialEq, Eq, Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub enum Error {
     /// A `Secp256k1` was used for an operation, but it was not created to
     /// support this (so necessary precomputations have not been done)
