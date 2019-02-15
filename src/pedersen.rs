@@ -126,7 +126,7 @@ impl Clone for RangeProof {
 	#[inline]
 	fn clone(&self) -> RangeProof {
 		unsafe {
-			use std::intrinsics::copy_nonoverlapping;
+			use std::ptr::copy_nonoverlapping;
 			use std::mem;
 			let mut ret: [u8; constants::MAX_PROOF_SIZE] = mem::uninitialized();
 			copy_nonoverlapping(
