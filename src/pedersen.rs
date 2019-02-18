@@ -1330,6 +1330,25 @@ mod tests {
 	}
 
 	#[test]
+	fn test_blind_commit() {
+		let secp = Secp256k1::with_caps(ContextFlag::Commit);
+		let rng = &mut thread_rng();
+		let value: u64 = 1;
+		let blind = SecretKey::new(&secp, rng);
+		let blind2 = ONE_KEY;
+		assert_eq!(secp.commit(value, blind.clone()).unwrap(), secp.commit_blind(blind2, blind.clone()).unwrap());
+		let value: u64 = 2;
+		let blind = SecretKey::new(&secp, rng);
+		assert_ne!(secp.commit(value, blind.clone()).unwrap(), secp.commit_blind(blind2, blind.clone()).unwrap());
+		let blind = SecretKey::new(&secp, rng);
+		let mut blind2 = ZERO_KEY;
+		blind2.0[30] = rng.gen::<u8>();
+		blind2.0[31] = rng.gen::<u8>();
+		let value: u64 = blind2[30] as u64*256 + blind2[31] as u64;
+		assert_eq!(secp.commit(value, blind.clone()).unwrap(), secp.commit_blind(blind2, blind.clone()).unwrap());
+	}
+
+	#[test]
 	fn test_range_proof() {
 		let secp = Secp256k1::with_caps(ContextFlag::Commit);
 		let blinding = SecretKey::new(&secp, &mut thread_rng());
