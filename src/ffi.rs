@@ -356,6 +356,14 @@ extern "C" {
                                        n: c_int)
                                        -> c_int;
 
+    pub fn secp256k1_ec_privkey_tweak_inv(cx: *const Context,
+                                          sk: *mut c_uchar)
+                                          -> c_int;
+
+    pub fn secp256k1_ec_privkey_tweak_neg(cx: *const Context,
+                                          sk: *mut c_uchar)
+                                          -> c_int;
+
     pub fn secp256k1_ecdh(cx: *const Context,
                           out: *mut SharedSecret,
                           point: *const PublicKey,
@@ -382,6 +390,17 @@ extern "C" {
 		commit: *mut c_uchar,
 		blind: *const c_uchar,
 		value: uint64_t,
+		value_gen: *const c_uchar,
+		blind_gen: *const c_uchar
+	) -> c_int;
+
+	// Generates a pedersen commitment: *commit = blind * G + value * G2.
+	// The commitment is 33 bytes, the blinding factor and the value are 32 bytes.
+	pub fn secp256k1_pedersen_blind_commit(
+		ctx: *const Context,
+		commit: *mut c_uchar,
+		blind: *const c_uchar,
+		value: *const c_uchar,
 		value_gen: *const c_uchar,
 		blind_gen: *const c_uchar
 	) -> c_int;

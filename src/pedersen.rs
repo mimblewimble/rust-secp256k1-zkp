@@ -415,6 +415,25 @@ impl Secp256k1 {
 		Ok(self.commit_ser(commit_i)?)
 	}
 
+	/// Creates a pedersen commitment from a two blinding factors
+	pub fn commit_blind(&self, value: SecretKey, blind: SecretKey) -> Result<Commitment, Error> {
+		if self.caps != ContextFlag::Commit {
+			return Err(Error::IncapableContext);
+		}
+		let mut commit_i = [0; constants::PEDERSEN_COMMITMENT_SIZE_INTERNAL];
+		unsafe {
+			ffi::secp256k1_pedersen_blind_commit(
+				self.ctx,
+				commit_i.as_mut_ptr(),
+				blind.as_ptr(),
+				value.as_ptr(),
+				constants::GENERATOR_H.as_ptr(),
+				constants::GENERATOR_G.as_ptr(),
+			)
+		};
+		Ok(self.commit_ser(commit_i)?)
+	}
+
 	/// Convenience method to Create a pedersen commitment only from a value,
 	/// with a zero blinding factor
 	pub fn commit_value(&self, value: u64) -> Result<Commitment, Error> {
@@ -1308,6 +1327,25 @@ mod tests {
 
 		let commit_f = secp.commit_sum(vec![commit_a], vec![commit_b]).unwrap();
 		assert_eq!(commit_e, commit_f);
+	}
+
+	#[test]
+	fn test_blind_commit() {
+		let secp = Secp256k1::with_caps(ContextFlag::Commit);
+		let rng = &mut thread_rng();
+		let value: u64 = 1;
+		let blind = SecretKey::new(&secp, rng);
+		let blind2 = ONE_KEY;
+		assert_eq!(secp.commit(value, blind.clone()).unwrap(), secp.commit_blind(blind2, blind.clone()).unwrap());
+		let value: u64 = 2;
+		let blind = SecretKey::new(&secp, rng);
+		assert_ne!(secp.commit(value, blind.clone()).unwrap(), secp.commit_blind(blind2, blind.clone()).unwrap());
+		let blind = SecretKey::new(&secp, rng);
+		let mut blind2 = ZERO_KEY;
+		blind2.0[30] = rng.gen::<u8>();
+		blind2.0[31] = rng.gen::<u8>();
+		let value: u64 = blind2[30] as u64*256 + blind2[31] as u64;
+		assert_eq!(secp.commit(value, blind.clone()).unwrap(), secp.commit_blind(blind2, blind.clone()).unwrap());
 	}
 
 	#[test]
