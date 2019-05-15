@@ -21,10 +21,10 @@
 #![deny(unused_mut)]
 #![warn(missing_docs)]
 
-extern crate gcc;
+extern crate cc;
 
 fn main() {
-    let mut base_config = gcc::Build::new();
+    let mut base_config = cc::Build::new();
     base_config.include("depend/secp256k1-zkp/")
                .include("depend/secp256k1-zkp/include")
                .include("depend/secp256k1-zkp/src")
