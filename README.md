@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.org/mimblewimble/rust-secp256k1-zkp.png?branch=master)](https://travis-ci.org/mimblewimble/rust-secp256k1-zkp)
+[![Build Status](https://dev.azure.com/mimblewimble/rust-secp256k1-zkp/_apis/build/status/quentinlesceller.rust-secp256k1-zkp?branchName=master)](https://dev.azure.com/mimblewimble/rust-secp256k1-zkp/_build/latest?definitionId=3&branchName=master)
 
 ### rust-secp256k1
 
