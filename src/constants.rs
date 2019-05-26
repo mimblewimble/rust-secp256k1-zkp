@@ -66,7 +66,7 @@ pub const PROOF_MSG_SIZE: usize = 2048;
 pub const PROOF_MSG_SIZE: usize = 2048;
 
 /// The maximum size of an optional message embedded in a bullet proof
-pub const BULLET_PROOF_MSG_SIZE: usize = 16;
+pub const BULLET_PROOF_MSG_SIZE: usize = 20;
 
 /// The order of the secp256k1 curve
 pub const CURVE_ORDER: [u8; 32] = [

@@ -745,7 +745,8 @@ impl Secp256k1 {
 		&self,
 		value: u64,
 		blind: SecretKey,
-		nonce: SecretKey,
+		rewind_nonce: SecretKey,
+		private_nonce: SecretKey,
 		extra_data_in: Option<Vec<u8>>,
 		message: Option<ProofMessage>,
 	) -> RangeProof {
@@ -773,12 +774,11 @@ impl Secp256k1 {
 			None => ptr::null(),
 		};
 
-		// This api is not for multi-party range proof, so all null for these 5 parameters.
+		// This api is not for multi-party range proof, so all null for these 4 parameters.
 		let tau_x = ptr::null_mut();
 		let t_one = ptr::null_mut();
 		let t_two = ptr::null_mut();
 		let commits = ptr::null_mut();
-		let private_nonce = ptr::null();
 
 		let _success = unsafe {
 			let scratch = ffi::secp256k1_scratch_space_create(self.ctx, SCRATCH_SPACE_SIZE);
@@ -798,8 +798,8 @@ impl Secp256k1 {
 				1,
 				constants::GENERATOR_H.as_ptr(),
 				n_bits as size_t,
-				nonce.as_ptr(),
-				private_nonce,
+				rewind_nonce.as_ptr(),
+				private_nonce.as_ptr(),
 				extra_data,
 				extra_data_len as size_t,
 				message_ptr,
@@ -1085,7 +1085,7 @@ impl Secp256k1 {
 
 		let mut blind_out = [0u8; constants::SECRET_KEY_SIZE];
 		let mut value_out = 0;
-		let mut message_out = [0u8; 16];
+		let mut message_out = [0u8; 20];
 		let commit = self.commit_parse(commit.0)?;
 
 		let success = unsafe {
