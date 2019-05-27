@@ -1092,7 +1092,6 @@ impl Secp256k1 {
 			let scratch = ffi::secp256k1_scratch_space_create(self.ctx, SCRATCH_SPACE_SIZE);
 			let result = ffi::secp256k1_bulletproof_rangeproof_rewind(
 				self.ctx,
-				shared_generators(self.ctx),
 				&mut value_out,
 				blind_out.as_mut_ptr(),
 				proof.proof.as_ptr(),
