@@ -424,11 +424,11 @@ mod test {
         // Create buffer for blinding factor filled with non-zero bytes.
         let sk_bytes = ONE_KEY;
         let ptr = {
-            // Fill blinding factor with some "sensitive" data
+            // Fill blinding factor with some "sensitive" data.
             let sk = SecretKey::from_slice(&s, &sk_bytes[..]).unwrap();
             sk.0.as_ptr()
 
-            // -- after this line BlindingFactor should be zeroed
+            // -- after this line SecretKey should be zeroed.
         };
 
         // Unsafely get data from where SecretKey was in memory. Should be all zeros.
