@@ -16,8 +16,6 @@
 // This is a macro that routinely comes in handy
 macro_rules! impl_array_newtype {
     ($thing:ident, $ty:ty, $len:expr) => {
-        impl Copy for $thing {}
-
         impl $thing {
             #[inline]
             /// Converts the object to a raw pointer for FFI interfacing

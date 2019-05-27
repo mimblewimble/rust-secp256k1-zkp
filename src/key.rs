@@ -26,7 +26,10 @@ use super::Error::{self, IncapableContext, InvalidPublicKey, InvalidSecretKey};
 use crate::constants;
 use crate::ffi;
 
+use zeroize::Zeroize;
+
 /// Secret 256-bit key used as `x` in an ECDSA signature
+#[derive(Zeroize)]
 pub struct SecretKey(pub [u8; constants::SECRET_KEY_SIZE]);
 impl_array_newtype!(SecretKey, u8, constants::SECRET_KEY_SIZE);
 impl_pretty_debug!(SecretKey);

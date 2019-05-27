@@ -39,8 +39,15 @@
 #![cfg_attr(all(test, feature = "unstable"), feature(test))]
 #[cfg(all(test, feature = "unstable"))] extern crate test;
 
+extern crate arrayvec;
 extern crate rustc_serialize as serialize;
+extern crate serde;
 extern crate serde_json as json;
+
+extern crate libc;
+extern crate rand;
+
+extern crate zeroize;
 
 use libc::size_t;
 use std::{error, fmt, ops, ptr};
@@ -414,6 +421,7 @@ impl ops::Index<ops::RangeFull> for Signature {
 
 /// A (hashed) message input to an ECDSA signature
 pub struct Message([u8; constants::MESSAGE_SIZE]);
+impl Copy for Message {}
 impl_array_newtype!(Message, u8, constants::MESSAGE_SIZE);
 impl_pretty_debug!(Message);
 
