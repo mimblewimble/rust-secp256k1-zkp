@@ -127,7 +127,6 @@ impl Clone for RangeProof {
 	fn clone(&self) -> RangeProof {
 		unsafe {
 			use std::ptr::copy_nonoverlapping;
-			use std::mem;
 			let mut ret: [u8; constants::MAX_PROOF_SIZE] = mem::uninitialized();
 			copy_nonoverlapping(
 				self.proof.as_ptr(),
@@ -166,7 +165,6 @@ impl<'di> de::Visitor<'di> for Visitor {
 		V: de::SeqAccess<'di>,
 	{
 		unsafe {
-			use std::mem;
 			let mut ret: [u8; constants::MAX_PROOF_SIZE] = mem::uninitialized();
 			let mut i = 0;
 			while let Some(val) = v.next_element()? {
@@ -860,7 +858,7 @@ impl Secp256k1 {
 		};
 
 		let tau_x = match tau_x {
-			Some(mut n) => n.0.as_mut_ptr(),
+			Some(n) => n.0.as_mut_ptr(),
 			None => ptr::null_mut(),
 		};
 
