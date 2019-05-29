@@ -13,12 +13,12 @@
 
 //! # Aggregated Signature (a.k.a. Schnorr) Functionality
 
-use ffi;
-use key::{PublicKey, SecretKey};
+use crate::ffi;
+use crate::key::{PublicKey, SecretKey};
 use rand::{thread_rng, Rng};
 use std::ptr;
-use Secp256k1;
-use {AggSigPartialSignature, Error, Message, Signature};
+use crate::Secp256k1;
+use crate::{AggSigPartialSignature, Error, Message, Signature};
 
 /// The 256 bits 0
 pub const ZERO_256: [u8; 32] = [
@@ -351,11 +351,11 @@ mod tests {
 		add_signatures_single, export_secnonce_single, sign_single, verify_single, AggSigContext,
 		Secp256k1,
 	};
-	use ffi;
-	use key::{PublicKey, SecretKey};
+	use crate::ffi;
+	use crate::key::{PublicKey, SecretKey};
 	use rand::{thread_rng, Rng};
-	use ContextFlag;
-	use {AggSigPartialSignature, Message, Signature};
+	use crate::ContextFlag;
+	use crate::{AggSigPartialSignature, Message, Signature};
 
 	#[test]
 	fn test_aggsig_multisig() {
