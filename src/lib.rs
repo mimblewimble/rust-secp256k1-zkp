@@ -39,13 +39,8 @@
 #![cfg_attr(all(test, feature = "unstable"), feature(test))]
 #[cfg(all(test, feature = "unstable"))] extern crate test;
 
-extern crate arrayvec;
 extern crate rustc_serialize as serialize;
-extern crate serde;
 extern crate serde_json as json;
-
-extern crate libc;
-extern crate rand;
 
 use libc::size_t;
 use std::{error, fmt, ops, ptr};
@@ -234,7 +229,7 @@ impl serde::Serialize for Signature {
     fn serialize<S>(&self, s: S) -> Result<S::Ok, S::Error>
         where S: serde::Serializer
     {
-        let secp = Secp256k1::with_caps(::ContextFlag::None);
+        let secp = Secp256k1::with_caps(crate::ContextFlag::None);
         (&self.serialize_compact(&secp)[..]).serialize(s)
     }
 }
@@ -254,7 +249,7 @@ impl<'de> serde::Deserialize<'de> for Signature {
             fn visit_seq<A>(self, mut a: A) -> Result<Signature, A::Error>
                 where A: de::SeqAccess<'de>
             {
-                let s = Secp256k1::with_caps(::ContextFlag::None);
+                let s = Secp256k1::with_caps(crate::ContextFlag::None);
                 unsafe {
                     use std::mem;
                     let mut ret: [u8; constants::COMPACT_SIGNATURE_SIZE] = mem::uninitialized();
@@ -693,8 +688,8 @@ impl Secp256k1 {
 #[cfg(test)]
 mod tests {
     use rand::{Rng, thread_rng};
-    use serialize::hex::FromHex;
-    use key::{SecretKey, PublicKey};
+    use crate::serialize::hex::FromHex;
+    use crate::key::{SecretKey, PublicKey};
     use super::constants;
     use super::{Secp256k1, Signature, RecoverableSignature, Message, RecoveryId, ContextFlag};
     use super::Error::{InvalidMessage, InvalidPublicKey, IncorrectSignature, InvalidSignature,
@@ -876,7 +871,7 @@ mod tests {
         wild_keys[0][0] = 1;
         wild_msgs[1][0] = 1;
 
-        use constants;
+        use crate::constants;
         wild_keys[1][..].copy_from_slice(&constants::CURVE_ORDER[..]);
         wild_msgs[1][..].copy_from_slice(&constants::CURVE_ORDER[..]);
         wild_msgs[2][..].copy_from_slice(&constants::CURVE_ORDER[..]);

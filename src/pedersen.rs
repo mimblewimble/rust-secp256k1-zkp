@@ -23,15 +23,15 @@ use std::mem;
 use std::ptr;
 use std::u64;
 
-use ContextFlag;
-use Error::{self, InvalidPublicKey};
-use Secp256k1;
+use crate::ContextFlag;
+use crate::Error::{self, InvalidPublicKey};
+use crate::Secp256k1;
 
 use super::{Message, Signature};
-use aggsig::ZERO_256;
-use constants;
-use ffi;
-use key::{self, PublicKey, SecretKey};
+use crate::aggsig::ZERO_256;
+use crate::constants;
+use crate::ffi;
+use crate::key::{self, PublicKey, SecretKey};
 use rand::{thread_rng, Rng};
 use serde::{de, ser};
 
@@ -127,7 +127,6 @@ impl Clone for RangeProof {
 	fn clone(&self) -> RangeProof {
 		unsafe {
 			use std::ptr::copy_nonoverlapping;
-			use std::mem;
 			let mut ret: [u8; constants::MAX_PROOF_SIZE] = mem::uninitialized();
 			copy_nonoverlapping(
 				self.proof.as_ptr(),
@@ -166,7 +165,6 @@ impl<'di> de::Visitor<'di> for Visitor {
 		V: de::SeqAccess<'di>,
 	{
 		unsafe {
-			use std::mem;
 			let mut ret: [u8; constants::MAX_PROOF_SIZE] = mem::uninitialized();
 			let mut i = 0;
 			while let Some(val) = v.next_element()? {
@@ -860,7 +858,7 @@ impl Secp256k1 {
 		};
 
 		let tau_x = match tau_x {
-			Some(mut n) => n.0.as_mut_ptr(),
+			Some(n) => n.0.as_mut_ptr(),
 			None => ptr::null_mut(),
 		};
 
@@ -1132,13 +1130,13 @@ impl Secp256k1 {
 mod tests {
 	extern crate chrono;
 	use super::{Commitment, Error, Message, ProofMessage, ProofRange, RangeProof, Secp256k1};
-	use key::{PublicKey, SecretKey, ONE_KEY, ZERO_KEY};
-	use ContextFlag;
-	use constants;
+	use crate::key::{PublicKey, SecretKey, ONE_KEY, ZERO_KEY};
+	use crate::ContextFlag;
+	use crate::constants;
 
 	use rand::{thread_rng, Rng};
 
-	use pedersen::tests::chrono::prelude::*;
+	use crate::pedersen::tests::chrono::prelude::*;
 
 	#[test]
 	fn commit_parse_ser() {
