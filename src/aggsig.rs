@@ -389,7 +389,7 @@ mod tests {
 				msg, i, keypairs[i].0
 			);
 
-			let result = aggsig.partial_sign(msg, keypairs[i].0, i);
+			let result = aggsig.partial_sign(msg, keypairs[i].0.clone(), i);
 			match result {
 				Ok(ps) => {
 					println!("Partial sig: {:?}", ps);

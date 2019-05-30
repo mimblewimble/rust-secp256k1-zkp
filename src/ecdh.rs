@@ -23,7 +23,7 @@ use crate::key::{SecretKey, PublicKey};
 use crate::ffi;
 
 /// A tag used for recovering the public key from a compact signature
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct SharedSecret(ffi::SharedSecret);
 
 impl SharedSecret {
