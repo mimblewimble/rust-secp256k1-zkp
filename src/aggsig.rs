@@ -202,7 +202,7 @@ pub fn verify_batch(
 	msgs: &Vec<Message>,
 	pub_keys: &Vec<PublicKey>,
 ) -> bool {
-	let sigs_vec = map_vec!(sigs, |s| s.to_raw_data().as_ptr());
+	let sigs_vec = map_vec!(sigs, |s| s.0.as_ptr());
 	let msgs_vec = map_vec!(msgs, |m| m.as_ptr());
 	let pub_keys_vec = map_vec!(pub_keys, |pk| pk.as_ptr());
 
@@ -511,9 +511,9 @@ mod tests {
 			thread_rng().fill(&mut msg);
 
 			let msg = Message::from_slice(&msg).unwrap();
-			let sig = sign_single(&secp, &msg, &sk, None, None, None, None, None).unwrap();
+			let sig = sign_single(&secp, &msg, &sk, None, None, None, Some(&pk), None).unwrap();
 			
-			let result_single = verify_single(&secp, &sig, &msg, None, &pk, None, None, false);
+			let result_single = verify_single(&secp, &sig, &msg, None, &pk, Some(&pk), None, false);
 			assert!(result_single == true);
 			
 			pub_keys.push(pk);
