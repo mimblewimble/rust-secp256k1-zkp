@@ -21,8 +21,7 @@ use std::ptr;
 use crate::Secp256k1;
 use crate::{AggSigPartialSignature, Error, Message, Signature};
 
-const MAX_WIDTH: usize = 1 << 20;
-const SCRATCH_SPACE_SIZE: size_t = 256 * MAX_WIDTH;
+const SCRATCH_SPACE_SIZE: size_t = 1024 * 1024;
 
 /// The 256 bits 0
 pub const ZERO_256: [u8; 32] = [
@@ -202,6 +201,16 @@ pub fn verify_batch(
 	msgs: &Vec<Message>,
 	pub_keys: &Vec<PublicKey>,
 ) -> bool {
+	if sigs.len() != msgs.len() || sigs.len() != pub_keys.len() {
+		return false;
+	}
+
+	for i in 0..pub_keys.len() {
+		if (pub_keys[i].0).0.starts_with(&ZERO_256) {
+			return false;
+		}
+	}
+
 	let sigs_vec = map_vec!(sigs, |s| s.0.as_ptr());
 	let msgs_vec = map_vec!(msgs, |m| m.as_ptr());
 	let pub_keys_vec = map_vec!(pub_keys, |pk| pk.as_ptr());
@@ -586,6 +595,21 @@ mod tests {
 		let result = verify_single(&secp, &sig, &msg, None, &zero_pk, None, None, false);
 		println!("Signature verification single (correct): {}", result);
 		assert!(result == false);
+
+		let mut sigs: Vec<Signature> = vec![];
+		sigs.push(sig);
+		let mut msgs: Vec<Message> = vec![];
+		msgs.push(msg);
+		let mut pub_keys: Vec<PublicKey> = vec![];
+		pub_keys.push(zero_pk);
+		println!(
+			"Verifying aggsig batch: {:?}, msg: {:?}, pk:{:?}",
+			sig, msg, zero_pk
+		);
+		let result = verify_batch(&secp, &sigs, &msgs, &pub_keys);
+		println!("Signature verification batch: {}", result);
+		assert!(result == false);
+
 
 		// force pk[0..32] as 0 to simulate Fuzz test
 		let corrupted = &mut [0u8; 64];
