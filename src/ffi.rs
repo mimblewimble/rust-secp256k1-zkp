@@ -320,12 +320,12 @@ extern "C" {
                                            -> c_int;
 
     pub fn secp256k1_schnorrsig_verify_batch(cx: *const Context,
-		                                     scratch: *mut ScratchSpace,
+                                             scratch: *mut ScratchSpace,
                                              sig: *const *const c_uchar,
                                              msg32: *const *const c_uchar,
                                              pk: *const *const PublicKey,
                                              n_sigs: size_t)
-                                                -> c_int;
+                                               -> c_int;
 
     pub fn secp256k1_aggsig_add_signatures_single(cx: *const Context,
                                                   ret_sig: *mut Signature,
