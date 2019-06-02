@@ -413,7 +413,7 @@ mod test {
     use self::rand_core::impls;
 
     use std::slice::from_raw_parts;
-    use key::ONE_KEY;
+    use crate::key::ONE_KEY;
 
     // This tests cleaning of SecretKey (e.g. secret key) on Drop.
     // To make this test fail, just remove `Zeroize` derive from `SecretKey` definition.
