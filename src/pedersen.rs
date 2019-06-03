@@ -1461,7 +1461,7 @@ mod tests {
 			secp.bullet_proof(value, blinding.clone(), private_nonce.clone(), private_nonce.clone(), Some(extra_data.clone()), None);
 		// Unwind message with same blinding factor
 		let proof_info = secp
-			.rewind_bullet_proof(commit, private_nonce, Some(extra_data.clone()), bullet_proof)
+			.rewind_bullet_proof(commit, private_nonce.clone(), Some(extra_data.clone()), bullet_proof)
 			.unwrap();
 		assert_eq!(proof_info.value, value);
 		assert_eq!(blinding, proof_info.blinding);
@@ -1478,7 +1478,7 @@ mod tests {
 		}
 
 		// unwinding with wrong extra data should puke
-		let proof_info = secp.rewind_bullet_proof(commit, private_nonce, None, bullet_proof);
+		let proof_info = secp.rewind_bullet_proof(commit, private_nonce.clone(), None, bullet_proof);
 		if !proof_info.is_err() {
 			panic!("Bullet proof verify with message should have errored.");
 		}
