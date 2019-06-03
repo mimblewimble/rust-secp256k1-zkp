@@ -1392,7 +1392,7 @@ mod tests {
 		let blinding = SecretKey::new(&secp, &mut thread_rng());
 		let value = 12345678;
 		let commit = secp.commit(value, blinding).unwrap();
-		let bullet_proof = secp.bullet_proof(value, blinding, blinding, None, None);
+		let bullet_proof = secp.bullet_proof(value, blinding.clone(), blinding.clone(), blinding.clone(), None, None);
 
 		// correct verification
 		println!("Bullet proof len: {}", bullet_proof.plen);
@@ -1404,7 +1404,7 @@ mod tests {
 		// wrong value committed to
 		let value = 12345678;
 		let wrong_commit = secp.commit(87654321, blinding).unwrap();
-		let bullet_proof = secp.bullet_proof(value, blinding, blinding, None, None);
+		let bullet_proof = secp.bullet_proof(value, blinding.clone(), blinding.clone(), blinding.clone(), None, None);
 		if !secp
 			.verify_bullet_proof(wrong_commit, bullet_proof, None)
 			.is_err()
@@ -1416,7 +1416,7 @@ mod tests {
 		let value = 12345678;
 		let commit = secp.commit(value, blinding).unwrap();
 		let blinding = SecretKey::new(&secp, &mut thread_rng());
-		let bullet_proof = secp.bullet_proof(value, blinding, blinding, None, None);
+		let bullet_proof = secp.bullet_proof(value, blinding.clone(), blinding.clone(), blinding.clone(), None, None);
 		if !secp
 			.verify_bullet_proof(commit, bullet_proof, None)
 			.is_err()
@@ -1430,7 +1430,7 @@ mod tests {
 		let value = 12345678;
 		let commit = secp.commit(value, blinding).unwrap();
 		let bullet_proof =
-			secp.bullet_proof(value, blinding, blinding, Some(extra_data.clone()), None);
+			secp.bullet_proof(value, blinding.clone(), blinding.clone(), blinding.clone(), Some(extra_data.clone()), None);
 		if secp
 			.verify_bullet_proof(commit, bullet_proof, Some(extra_data.clone()))
 			.is_err()
@@ -1452,15 +1452,16 @@ mod tests {
 		// Ensure rewinding works
 
 		let blinding = SecretKey::new(&secp, &mut thread_rng());
-		let nonce = SecretKey::new(&secp, &mut thread_rng());
+		let rewind_nonce = SecretKey::new(&secp, &mut thread_rng());
+		let private_nonce = SecretKey::new(&secp, &mut thread_rng());
 		let value = 12345678;
 		let commit = secp.commit(value, blinding).unwrap();
 
 		let bullet_proof =
-			secp.bullet_proof(value, blinding, nonce, Some(extra_data.clone()), None);
+			secp.bullet_proof(value, blinding.clone(), private_nonce.clone(), private_nonce.clone(), Some(extra_data.clone()), None);
 		// Unwind message with same blinding factor
 		let proof_info = secp
-			.rewind_bullet_proof(commit, nonce, Some(extra_data.clone()), bullet_proof)
+			.rewind_bullet_proof(commit, private_nonce, Some(extra_data.clone()), bullet_proof)
 			.unwrap();
 		assert_eq!(proof_info.value, value);
 		assert_eq!(blinding, proof_info.blinding);
@@ -1477,26 +1478,28 @@ mod tests {
 		}
 
 		// unwinding with wrong extra data should puke
-		let proof_info = secp.rewind_bullet_proof(commit, nonce, None, bullet_proof);
+		let proof_info = secp.rewind_bullet_proof(commit, private_nonce, None, bullet_proof);
 		if !proof_info.is_err() {
 			panic!("Bullet proof verify with message should have errored.");
 		}
 
 		// Ensure including a message also works
-		let message_bytes: [u8; 16] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16];
+		let message_bytes: [u8; 20] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20];
 		let message = ProofMessage::from_bytes(&message_bytes);
 
 		let bullet_proof = secp.bullet_proof(
 			value,
-			blinding,
-			nonce,
+			blinding.clone(),
+			rewind_nonce.clone(),
+			private_nonce.clone(),
 			Some(extra_data.clone()),
 			Some(message.clone()),
 		);
 		// Unwind message with same blinding factor
 		let proof_info = secp
-			.rewind_bullet_proof(commit, nonce, Some(extra_data.clone()), bullet_proof)
+			.rewind_bullet_proof(commit, rewind_nonce, Some(extra_data.clone()), bullet_proof)
 			.unwrap();
+		assert_eq!(proof_info.value, value);
 		assert_eq!(proof_info.message, message);
 	}
 
@@ -1790,7 +1793,7 @@ mod tests {
 		let commit = secp.commit(value, blinding).unwrap();
 
 		let mut pm = ProofMessage::from_bytes(&[0u8;32]);
-		let bullet_proof = secp.bullet_proof(value, blinding, nonce, None, Some(pm.clone()));
+		let bullet_proof = secp.bullet_proof(value, blinding, nonce.clone(), nonce.clone(), None, Some(pm.clone()));
 		// Unwind message with same blinding factor
 		let proof_info = secp
 			.rewind_bullet_proof(commit, nonce, None, bullet_proof)
@@ -1809,7 +1812,7 @@ mod tests {
 		let value = <u64>::max_value() - 1;
 		let commit = secp.commit(value, blinding).unwrap();
 
-		let bullet_proof = secp.bullet_proof(value, blinding, nonce, None, None);
+		let bullet_proof = secp.bullet_proof(value, blinding, nonce.clone(), nonce.clone(), None, None);
 		// Unwind message with same blinding factor
 		let proof_info = secp
 			.rewind_bullet_proof(commit, nonce, None, bullet_proof)
@@ -1834,7 +1837,7 @@ mod tests {
 			let mut proofs: Vec<RangeProof> = vec![];
 			for i in 0..v {
 				commits.push(secp.commit(value + i as u64, blinding).unwrap());
-				proofs.push(secp.bullet_proof(value + i as u64, blinding, blinding, None, None));
+				proofs.push(secp.bullet_proof(value + i as u64, blinding, blinding, blinding, None, None));
 			}
 			println!("--------");
 			println!("Comparing {} Proofs", v);
@@ -1871,7 +1874,7 @@ mod tests {
 		let wrong_commit = secp.commit(value, wrong_blinding).unwrap();
 
 		commits.push(secp.commit(value, blinding).unwrap());
-		proofs.push(secp.bullet_proof(value, blinding, blinding, None, None));
+		proofs.push(secp.bullet_proof(value, blinding, blinding, blinding, None, None));
 		let proof_range = secp
 			.verify_bullet_proof(commits[0].clone(), proofs[0].clone(), None)
 			.unwrap();
@@ -1897,8 +1900,8 @@ mod tests {
 		proofs = vec![];
 		commits.push(secp.commit(value + 1, blinding).unwrap());
 		commits.push(secp.commit(value - 1, blinding).unwrap());
-		proofs.push(secp.bullet_proof(value + 1, blinding, blinding, None, None));
-		proofs.push(secp.bullet_proof(value - 1, blinding, blinding, None, None));
+		proofs.push(secp.bullet_proof(value + 1, blinding, blinding, blinding, None, None));
+		proofs.push(secp.bullet_proof(value - 1, blinding, blinding, blinding, None, None));
 		let proof_range = secp
 			.verify_bullet_proof_multi(commits.clone(), proofs.clone(), None)
 			.unwrap();
@@ -1915,11 +1918,13 @@ mod tests {
 			value + 1,
 			blinding,
 			blinding,
+			blinding,
 			Some(extra_data1.clone()),
 			None,
 		));
 		proofs.push(secp.bullet_proof(
 			value - 1,
+			blinding,
 			blinding,
 			blinding,
 			Some(extra_data2.clone()),
@@ -1953,7 +1958,7 @@ mod tests {
 		for i in 1..100 {
 			print!("\r\r\r{}", i);
 			commits.push(secp.commit(value + i as u64, blinding).unwrap());
-			proofs.push(secp.bullet_proof(value + i as u64, blinding, blinding, None, None));
+			proofs.push(secp.bullet_proof(value + i as u64, blinding, blinding, blinding, None, None));
 			let proof_range = secp.verify_bullet_proof_multi(commits.clone(), proofs.clone(), None); //.unwrap();
 			if proof_range.is_err() {
 				println!(" proofs batch verify failed");
