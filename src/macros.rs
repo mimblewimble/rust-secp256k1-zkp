@@ -16,8 +16,6 @@
 // This is a macro that routinely comes in handy
 macro_rules! impl_array_newtype {
     ($thing:ident, $ty:ty, $len:expr) => {
-        impl Copy for $thing {}
-
         impl $thing {
             #[inline]
             /// Converts the object to a raw pointer for FFI interfacing
@@ -131,9 +129,9 @@ macro_rules! impl_array_newtype {
           }
         }
 
-        impl ::serialize::Decodable for $thing {
-            fn decode<D: ::serialize::Decoder>(d: &mut D) -> Result<$thing, D::Error> {
-                use serialize::Decodable;
+        impl crate::serialize::Decodable for $thing {
+            fn decode<D: crate::serialize::Decoder>(d: &mut D) -> Result<$thing, D::Error> {
+                use crate::serialize::Decodable;
 
                 d.read_seq(|d, len| {
                     if len != $len {
@@ -152,8 +150,8 @@ macro_rules! impl_array_newtype {
             }
         }
 
-        impl ::serialize::Encodable for $thing {
-            fn encode<S: ::serialize::Encoder>(&self, s: &mut S)
+        impl crate::serialize::Encodable for $thing {
+            fn encode<S: crate::serialize::Encoder>(&self, s: &mut S)
                                                -> Result<(), S::Error> {
                 self[..].encode(s)
             }
@@ -217,9 +215,9 @@ macro_rules! impl_pretty_debug {
     ($thing:ident) => {
         impl ::std::fmt::Debug for $thing {
             fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
-                try!(write!(f, "{}(", stringify!($thing)));
+                write!(f, "{}(", stringify!($thing))?;
                 for i in self[..].iter().cloned() {
-                    try!(write!(f, "{:02x}", i));
+                    write!(f, "{:02x}", i)?;
                 }
                 write!(f, ")")
             }
@@ -232,7 +230,7 @@ macro_rules! impl_raw_debug {
         impl ::std::fmt::Debug for $thing {
             fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
                 for i in self[..].iter().cloned() {
-                    try!(write!(f, "{:02x}", i));
+                    write!(f, "{:02x}", i)?;
                 }
                 Ok(())
             }
@@ -255,10 +253,10 @@ macro_rules! round_trip_serde (
         let start = $var;
         let mut encoded = Vec::new();
         {
-            let mut serializer = ::json::ser::Serializer::new(&mut encoded);
+            let mut serializer = crate::json::ser::Serializer::new(&mut encoded);
             ::serde::Serialize::serialize(&start, &mut serializer).unwrap();
         }
-        let mut deserializer = ::json::de::Deserializer::from_slice(&encoded);
+        let mut deserializer = crate::json::de::Deserializer::from_slice(&encoded);
         let decoded = ::serde::Deserialize::deserialize(&mut deserializer);
         assert_eq!(Some(start), decoded.ok());
     })

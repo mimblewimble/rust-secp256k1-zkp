@@ -69,12 +69,14 @@ pub type NonceFn = unsafe extern "C" fn(nonce32: *mut c_uchar,
 /// Generator
 #[repr(C)] 
 pub struct Generator(pub [c_uchar; 64]);
+impl Copy for Generator {}
 impl_array_newtype!(Generator, c_uchar, 64);
 impl_raw_debug!(Generator);
 
 /// Library-internal representation of a Secp256k1 public key
 #[repr(C)]
 pub struct PublicKey(pub [c_uchar; 64]);
+impl Copy for PublicKey {}
 impl_array_newtype!(PublicKey, c_uchar, 64);
 impl_raw_debug!(PublicKey);
 
@@ -88,18 +90,21 @@ impl PublicKey {
 /// Library-internal representation of a Secp256k1 signature
 #[repr(C)]
 pub struct Signature(pub [c_uchar; 64]);
+impl Copy for Signature {}
 impl_array_newtype!(Signature, c_uchar, 64);
 impl_raw_debug!(Signature);
 
 /// Library-internal representation of a Secp256k1 signature + recovery ID
 #[repr(C)]
 pub struct RecoverableSignature([c_uchar; 65]);
+impl Copy for RecoverableSignature {}
 impl_array_newtype!(RecoverableSignature, c_uchar, 65);
 impl_raw_debug!(RecoverableSignature);
 
 /// Library-internal representation of a Secp256k1 aggsig partial signature
 #[repr(C)]
 pub struct AggSigPartialSignature([c_uchar; 32]);
+impl Copy for AggSigPartialSignature {}
 impl_array_newtype!(AggSigPartialSignature, c_uchar, 32);
 impl_raw_debug!(AggSigPartialSignature);
 
@@ -313,6 +318,14 @@ extern "C" {
                                           extra_pubkey: *const PublicKey,
                                           is_partial: c_uint)
                                            -> c_int;
+
+    pub fn secp256k1_schnorrsig_verify_batch(cx: *const Context,
+                                             scratch: *mut ScratchSpace,
+                                             sig: *const *const c_uchar,
+                                             msg32: *const *const c_uchar,
+                                             pk: *const *const PublicKey,
+                                             n_sigs: size_t)
+                                               -> c_int;
 
     pub fn secp256k1_aggsig_add_signatures_single(cx: *const Context,
                                                   ret_sig: *mut Signature,

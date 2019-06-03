@@ -18,15 +18,18 @@
 use std::marker;
 use arrayvec::ArrayVec;
 use rand::Rng;
-use serialize::{Decoder, Decodable, Encoder, Encodable};
+use crate::serialize::{Decoder, Decodable, Encoder, Encodable};
 use serde::{Serialize, Deserialize, Serializer, Deserializer};
 
 use super::{Secp256k1, ContextFlag};
 use super::Error::{self, IncapableContext, InvalidPublicKey, InvalidSecretKey};
-use constants;
-use ffi;
+use crate::constants;
+use crate::ffi;
+
+use zeroize::Zeroize;
 
 /// Secret 256-bit key used as `x` in an ECDSA signature
+#[derive(Zeroize)]
 pub struct SecretKey(pub [u8; constants::SECRET_KEY_SIZE]);
 impl_array_newtype!(SecretKey, u8, constants::SECRET_KEY_SIZE);
 impl_pretty_debug!(SecretKey);
@@ -287,7 +290,7 @@ impl PublicKey {
 impl Decodable for PublicKey {
     fn decode<D: Decoder>(d: &mut D) -> Result<PublicKey, D::Error> {
         d.read_seq(|d, len| {
-            let s = Secp256k1::with_caps(::ContextFlag::None);
+            let s = Secp256k1::with_caps(crate::ContextFlag::None);
             if len == constants::UNCOMPRESSED_PUBLIC_KEY_SIZE {
                 unsafe {
                     use std::mem;
@@ -324,7 +327,7 @@ impl From<ffi::PublicKey> for PublicKey {
 
 impl Encodable for PublicKey {
     fn encode<S: Encoder>(&self, s: &mut S) -> Result<(), S::Error> {
-        let secp = Secp256k1::with_caps(::ContextFlag::None);
+        let secp = Secp256k1::with_caps(crate::ContextFlag::None);
         self.serialize_vec(&secp, true).encode(s)
     }
 }
@@ -346,7 +349,7 @@ impl<'de> Deserialize<'de> for PublicKey {
             {
                 debug_assert!(constants::UNCOMPRESSED_PUBLIC_KEY_SIZE >= constants::COMPRESSED_PUBLIC_KEY_SIZE);
 
-                let s = Secp256k1::with_caps(::ContextFlag::None);
+                let s = Secp256k1::with_caps(crate::ContextFlag::None);
                 unsafe {
                     use std::mem;
                     let mut ret: [u8; constants::UNCOMPRESSED_PUBLIC_KEY_SIZE] = mem::uninitialized();
@@ -393,7 +396,7 @@ impl Serialize for PublicKey {
     fn serialize<S>(&self, s: S) -> Result<S::Ok, S::Error>
         where S: Serializer
     {
-        let secp = Secp256k1::with_caps(::ContextFlag::None);
+        let secp = Secp256k1::with_caps(crate::ContextFlag::None);
         (&self.serialize_vec(&secp, true)[..]).serialize(s)
     }
 }
@@ -408,6 +411,39 @@ mod test {
 
     use rand::{Error, RngCore, thread_rng};
     use self::rand_core::impls;
+
+    use std::slice::from_raw_parts;
+    use crate::key::ONE_KEY;
+
+    // This tests cleaning of SecretKey (e.g. secret key) on Drop.
+    // To make this test fail, just remove `Zeroize` derive from `SecretKey` definition.
+    #[test]
+    fn skey_clear_on_drop() {
+        let s = Secp256k1::new();
+
+        // Create buffer for blinding factor filled with non-zero bytes.
+        let sk_bytes = ONE_KEY;
+        let ptr = {
+            // Fill blinding factor with some "sensitive" data.
+            let sk = SecretKey::from_slice(&s, &sk_bytes[..]).unwrap();
+            sk.0.as_ptr()
+
+            // -- after this line SecretKey should be zeroed.
+        };
+
+        // Unsafely get data from where SecretKey was in memory. Should be all zeros.
+        let sk_bytes = unsafe { from_raw_parts(ptr, constants::SECRET_KEY_SIZE) };
+
+        // There should be all zeroes.
+        let mut all_zeros = true;
+        for b in sk_bytes {
+            if *b != 0x00 {
+                all_zeros = false;
+            }
+        }
+
+        assert!(all_zeros)
+    }
 
     #[test]
     fn skey_from_slice() {
@@ -499,7 +535,7 @@ mod test {
     #[test]
     fn test_bad_deserialize() {
         use std::io::Cursor;
-        use serialize::{json, Decodable};
+        use crate::serialize::{json, Decodable};
 
         let zero31 = "[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]".as_bytes();
         let json31 = json::Json::from_reader(&mut Cursor::new(zero31)).unwrap();
@@ -534,7 +570,7 @@ mod test {
     #[test]
     fn test_serialize() {
         use std::io::Cursor;
-        use serialize::{json, Decodable, Encodable};
+        use crate::serialize::{json, Decodable, Encodable};
 
         macro_rules! round_trip (
             ($var:ident) => ({
@@ -562,7 +598,7 @@ mod test {
     #[test]
     fn test_bad_serde_deserialize() {
         use serde::Deserialize;
-        use json;
+        use crate::json;
 
         // Invalid length
         let zero31 = "[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]";

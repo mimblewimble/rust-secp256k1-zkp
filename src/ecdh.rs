@@ -19,11 +19,11 @@
 use std::ops;
 
 use super::Secp256k1;
-use key::{SecretKey, PublicKey};
-use ffi;
+use crate::key::{SecretKey, PublicKey};
+use crate::ffi;
 
 /// A tag used for recovering the public key from a compact signature
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct SharedSecret(ffi::SharedSecret);
 
 impl SharedSecret {
@@ -98,7 +98,7 @@ mod tests {
 
     #[test]
     fn ecdh() {
-        let s = Secp256k1::with_caps(::ContextFlag::SignOnly);
+        let s = Secp256k1::with_caps(crate::ContextFlag::SignOnly);
         let (sk1, pk1) = s.generate_keypair(&mut thread_rng()).unwrap();
         let (sk2, pk2) = s.generate_keypair(&mut thread_rng()).unwrap();
 

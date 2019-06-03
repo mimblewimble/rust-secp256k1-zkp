@@ -21,10 +21,8 @@
 #![deny(unused_mut)]
 #![warn(missing_docs)]
 
-extern crate gcc;
-
 fn main() {
-    let mut base_config = gcc::Build::new();
+    let mut base_config = cc::Build::new();
     base_config.include("depend/secp256k1-zkp/")
                .include("depend/secp256k1-zkp/include")
                .include("depend/secp256k1-zkp/src")
@@ -43,7 +41,8 @@ fn main() {
                .define("ENABLE_MODULE_RECOVERY", Some("1"))
                .define("ENABLE_MODULE_RANGEPROOF", Some("1"))
                .define("ENABLE_MODULE_BULLETPROOF", Some("1"))
-               .define("ENABLE_MODULE_AGGSIG", Some("1"));
+               .define("ENABLE_MODULE_AGGSIG", Some("1"))
+               .define("ENABLE_MODULE_SCHNORRSIG", Some("1"));
 
     // secp256k1-zkp
     base_config.file("depend/secp256k1-zkp/contrib/lax_der_parsing.c")
