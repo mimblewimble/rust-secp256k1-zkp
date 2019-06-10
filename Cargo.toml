@@ -1,7 +1,7 @@
 [package]
 
 name = "grin_secp256k1zkp"
-version = "0.7.5"
+version = "0.7.6"
 authors = [ "Grin Developers <mimblewimble@lists.launchpad.net>",
 						"Dawid Ciężarkiewicz <dpc@ucore.info>",
             "Andrew Poelstra <apoelstra@wpsoftware.net>" ]
