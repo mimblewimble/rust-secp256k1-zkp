@@ -18,7 +18,7 @@
 //! not be needed for most users.
 use std::mem;
 
-use libc::{c_int, c_uchar, c_uint, c_void, size_t, uint64_t};
+use libc::{c_int, c_uchar, c_uint, c_void, size_t};
 
 /// Flag for context to enable no precomputation
 pub const SECP256K1_START_NONE: c_uint = (1 << 0) | 0;
@@ -402,7 +402,7 @@ extern "C" {
 		ctx: *const Context,
 		commit: *mut c_uchar,
 		blind: *const c_uchar,
-		value: uint64_t,
+		value: u64,
 		value_gen: *const c_uchar,
 		blind_gen: *const c_uchar
 	) -> c_int;
@@ -450,7 +450,7 @@ extern "C" {
         ctx: *const Context,
         blind_switch: *mut c_uchar,
         blind: *const c_uchar,
-        value: uint64_t,
+        value: u64,
         value_gen: *const c_uchar,
         blind_gen: *const c_uchar,
         switch_pubkey: *const c_uchar
@@ -469,8 +469,8 @@ extern "C" {
 		ctx: *const Context,
 		exp: *mut c_int,
 		mantissa: *mut c_int,
-		min_value: *mut uint64_t,
-		max_value: *mut uint64_t,
+		min_value: *mut u64,
+		max_value: *mut u64,
 		proof: *const c_uchar,
 		plen: size_t
 	) -> c_int;
@@ -478,12 +478,12 @@ extern "C" {
 	pub fn secp256k1_rangeproof_rewind(
 		ctx: *const Context,
 		blind_out: *mut c_uchar,
-		value_out: *mut uint64_t,
+		value_out: *mut u64,
 		message_out: *mut c_uchar,
 		outlen: *mut size_t,
 		nonce: *const c_uchar,
-		min_value: *mut uint64_t,
-		max_value: *mut uint64_t,
+		min_value: *mut u64,
+		max_value: *mut u64,
 		commit: *const c_uchar,
 		proof: *const c_uchar,
 		plen: size_t,
@@ -494,8 +494,8 @@ extern "C" {
 
 	pub fn secp256k1_rangeproof_verify(
 		ctx: *const Context,
-		min_value: &mut uint64_t,
-		max_value: &mut uint64_t,
+		min_value: &mut u64,
+		max_value: &mut u64,
 		commit: *const c_uchar,
 		proof: *const c_uchar,
 		plen: size_t,
@@ -508,13 +508,13 @@ extern "C" {
 		ctx: *const Context,
 		proof: *mut c_uchar,
 		plen: *mut size_t,
-		min_value: uint64_t,
+		min_value: u64,
 		commit: *const c_uchar,
 		blind: *const c_uchar,
 		nonce: *const c_uchar,
 		exp: c_int,
 		min_bits: c_int,
-		value: uint64_t,
+		value: u64,
 		message: *const c_uchar,
 		msg_len: size_t,
 		extra_commit: *const c_uchar,
@@ -542,8 +542,8 @@ extern "C" {
 		tau_x: *mut c_uchar,
 		t_one: *mut PublicKey,
 		t_two: *mut PublicKey,
-		value: *const uint64_t,
-		min_value: *const uint64_t,
+		value: *const u64,
+		min_value: *const u64,
 		blind: *const *const c_uchar,
 		commits: *const *const c_uchar,
 		n_commits: size_t,
@@ -562,7 +562,7 @@ extern "C" {
 		gens: *const BulletproofGenerators,
 		proof: *const c_uchar,
 		plen: size_t,
-		min_value: *const uint64_t,
+		min_value: *const u64,
 		commit: *const c_uchar,
 		n_commits: size_t,
 		nbits: size_t,
@@ -578,7 +578,7 @@ extern "C" {
 		proofs: *const *const c_uchar,
 		n_proofs: size_t,
 		plen: size_t,
-		min_value: *const *const uint64_t,
+		min_value: *const *const u64,
 		commits: *const *const c_uchar,
 		n_commits: size_t,
 		nbits: size_t,
@@ -589,11 +589,11 @@ extern "C" {
 
 	pub fn secp256k1_bulletproof_rangeproof_rewind(
 		ctx: *const Context,
-		value: *mut uint64_t,
+		value: *mut u64,
 		blind: *mut c_uchar,
 		proof: *const c_uchar,
 		plen: size_t,
-		min_value: uint64_t,
+		min_value: u64,
 		commit: *const c_uchar,
 		value_gen: *const c_uchar,
 		nonce: *const c_uchar,
