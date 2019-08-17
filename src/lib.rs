@@ -45,7 +45,7 @@ extern crate serde;
 extern crate serde_json as json;
 
 extern crate libc;
-extern crate rand;
+pub extern crate rand;
 
 extern crate zeroize;
 
@@ -61,6 +61,9 @@ pub mod ffi;
 pub mod key;
 pub mod pedersen;
 pub mod aggsig;
+
+pub use key::SecretKey;
+pub use key::PublicKey;
 
 /// A tag used for recovering the public key from a compact signature
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
