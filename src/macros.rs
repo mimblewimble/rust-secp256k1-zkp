@@ -55,19 +55,19 @@ macro_rules! impl_array_newtype {
 
         impl Eq for $thing {}
 
-		impl PartialOrd for $thing {
-			#[inline]
-			fn partial_cmp(&self, other: &$thing) -> Option<::core::cmp::Ordering> {
-				self[..].partial_cmp(&other[..])
-			}
-		}
+        impl PartialOrd for $thing {
+            #[inline]
+            fn partial_cmp(&self, other: &$thing) -> Option<::core::cmp::Ordering> {
+                self[..].partial_cmp(&other[..])
+            }
+        }
 
-		impl Ord for $thing {
-			#[inline]
-			fn cmp(&self, other: &$thing) -> ::core::cmp::Ordering {
-				self[..].cmp(&other[..])
-			}
-		}
+        impl Ord for $thing {
+            #[inline]
+            fn cmp(&self, other: &$thing) -> ::core::cmp::Ordering {
+                self[..].cmp(&other[..])
+            }
+        }
 
         impl Clone for $thing {
             #[inline]
