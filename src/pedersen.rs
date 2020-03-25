@@ -24,7 +24,7 @@ use std::ptr;
 use std::u64;
 
 use crate::ContextFlag;
-use crate::Error::{self, InvalidPublicKey};
+use crate::Error::{self, InvalidPublicKey, InvalidCommit};
 use crate::Secp256k1;
 
 use super::{Message, Signature};
@@ -95,6 +95,18 @@ impl Commitment {
 		mem::uninitialized()
 	}
 
+	/// Creates from a pubkey
+	pub fn from_pubkey(secp: &Secp256k1, pk: &key::PublicKey) -> Result<Self, Error> {
+		unsafe {
+			let mut commit = Self::blank();
+			if ffi::secp256k1_pubkey_to_pedersen_commitment(secp.ctx, commit.as_mut_ptr(), &pk.0) == 1 {
+				Ok(commit)
+			} else {
+				Err(InvalidCommit)
+			}
+		}
+	}
+
 	/// Converts a commitment to a public key
 	pub fn to_pubkey(&self, secp: &Secp256k1) -> Result<key::PublicKey, Error> {
 		let mut pk = unsafe { ffi::PublicKey::blank() };
@@ -107,6 +119,7 @@ impl Commitment {
 			}
 		}
 	}
+
 }
 
 /// A range proof. Typically much larger in memory that the above (~5k).
@@ -1273,6 +1286,40 @@ mod tests {
 			Err(_) => {
 				panic!("this is not good");
 			}
+		}
+	}
+
+	#[test]
+	fn test_from_pubkey() {
+		for _ in 0..100 {
+			let secp = Secp256k1::with_caps(ContextFlag::Commit);
+			let blinding = SecretKey::new(&secp, &mut thread_rng());
+			let commit = secp.commit(1, blinding).unwrap();
+			let pubkey = commit.to_pubkey(&secp);
+			let p = match pubkey {
+				Ok(p) => {
+					// this is good
+					p
+				}
+				Err(e) => {
+					panic!("Creating pubkey: {}", e);
+				}
+			};
+			//println!("Pre Commit is: {:?}", commit);
+			//println!("Pre Pubkey is: {:?}", p);
+			let new_commit = Commitment::from_pubkey(&secp, &p);
+			let commit2 = match new_commit {
+				Ok(c) => {
+					// this is good
+					c
+				}
+				Err(e) => {
+					panic!("Creating commit from Pubkey: {}", e);
+				}
+			};
+			//println!("Post Commit is: {:?}", commit2);
+			//println!("Post Pubkey is: {:?}", p);
+			assert_eq!(commit, commit2);
 		}
 	}
 
