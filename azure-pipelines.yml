@@ -31,7 +31,7 @@ variables:
 jobs:
 - job: linux
   pool:
-    vmImage: ubuntu-16.04
+    vmImage: ubuntu-latest
   strategy:
     matrix:
       stable:
@@ -41,6 +41,9 @@ jobs:
       nightly:
         rustup_toolchain: nightly
   steps:
+    - script: |
+        rustup toolchain install $RUSTUP_TOOLCHAIN
+        rustup default $RUSTUP_TOOLCHAIN
     - script: |
         git submodule update --init 
         cargo build
@@ -52,7 +55,7 @@ jobs:
       displayName: Test
 - job: macos
   pool:
-    vmImage: macos-10.14
+    vmImage: macos-latest
   strategy:
     matrix:
       stable:
@@ -62,6 +65,9 @@ jobs:
       nightly:
         rustup_toolchain: nightly
   steps:
+    - script: |
+        rustup toolchain install $RUSTUP_TOOLCHAIN
+        rustup default $RUSTUP_TOOLCHAIN
     - script: |
         git submodule update --init 
         cargo build
@@ -73,7 +79,7 @@ jobs:
       displayName: Test
 - job: windows
   pool:
-    vmImage: windows-2019
+    vmImage: windows-latest
   strategy:
     matrix:
       stable:
@@ -83,6 +89,10 @@ jobs:
       nightly:
         rustup_toolchain: nightly
   steps:
+    - script: |
+        curl -sSf -o rustup-init.exe https://win.rustup.rs
+        rustup-init.exe -y --default-host x86_64-pc-windows-msvc --default-toolchain %RUSTUP_TOOLCHAIN%
+      displayName: Install Toolchain
     - script: |
         git submodule update --init
         cargo build

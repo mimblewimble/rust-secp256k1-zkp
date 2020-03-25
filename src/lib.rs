@@ -262,7 +262,7 @@ impl<'de> serde::Deserialize<'de> for Signature {
                 let s = Secp256k1::with_caps(crate::ContextFlag::None);
                 unsafe {
                     use std::mem;
-                    let mut ret: [u8; constants::COMPACT_SIGNATURE_SIZE] = mem::uninitialized();
+                    let mut ret: [u8; constants::COMPACT_SIGNATURE_SIZE] = mem::MaybeUninit::uninit().assume_init();
 
                     for i in 0..constants::COMPACT_SIGNATURE_SIZE {
                         ret[i] = match a.next_element()? {
@@ -487,7 +487,7 @@ impl fmt::Display for Error {
 }
 
 impl error::Error for Error {
-    fn cause(&self) -> Option<&error::Error> { None }
+    fn cause(&self) -> Option<&dyn error::Error> { None }
 
     fn description(&self) -> &str {
         match *self {

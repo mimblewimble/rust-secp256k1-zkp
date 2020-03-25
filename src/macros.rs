@@ -75,7 +75,7 @@ macro_rules! impl_array_newtype {
                 unsafe {
                     use std::ptr::copy_nonoverlapping;
                     use std::mem;
-                    let mut ret: $thing = mem::uninitialized();
+                    let mut ret: $thing = mem::MaybeUninit::uninit().assume_init();
                     copy_nonoverlapping(self.as_ptr(),
                                         ret.as_mut_ptr(),
                                         mem::size_of::<$thing>());
@@ -153,7 +153,7 @@ macro_rules! impl_array_newtype {
                     } else {
                         unsafe {
                             use std::mem;
-                            let mut ret: [$ty; $len] = mem::uninitialized();
+                            let mut ret: [$ty; $len] = mem::MaybeUninit::uninit().assume_init();
                             for i in 0..len {
                                 ret[i] = d.read_seq_elt(i, |d| Decodable::decode(d))?;
                             }
@@ -190,7 +190,7 @@ macro_rules! impl_array_newtype {
                     {
                         unsafe {
                             use std::mem;
-                            let mut ret: [$ty; $len] = mem::uninitialized();
+                            let mut ret: [$ty; $len] = mem::MaybeUninit::uninit().assume_init();
                             for i in 0..$len {
                                 ret[i] = match a.next_element()? {
                                     Some(c) => c,
