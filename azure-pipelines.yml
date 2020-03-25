@@ -91,11 +91,9 @@ jobs:
   steps:
     - script: |
         curl -sSf -o rustup-init.exe https://win.rustup.rs
-        rustup-init.exe -y --default-toolchain %RUSTUP_TOOLCHAIN%
-      displayName: Install Rust
-    - script: |
-        rustup toolchain install $RUSTUP_TOOLCHAIN
-        rustup default $RUSTUP_TOOLCHAIN
+        rustup-init.exe toolchain install %RUSTUP_TOOLCHAIN%
+        rustup-init.exe default %RUSTUP_TOOLCHAIN%
+      displayName: Install Toolchain
     - script: |
         git submodule update --init
         cargo build
