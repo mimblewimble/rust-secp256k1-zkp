@@ -463,6 +463,8 @@ pub enum Error {
     InvalidMessage,
     /// Bad public key
     InvalidPublicKey,
+    /// Bad commit
+    InvalidCommit,
     /// Bad signature
     InvalidSignature,
     /// Bad secret key
@@ -493,6 +495,7 @@ impl error::Error for Error {
             Error::IncorrectSignature => "secp: signature failed verification",
             Error::InvalidMessage => "secp: message was not 32 bytes (do you need to hash?)",
             Error::InvalidPublicKey => "secp: malformed public key",
+            Error::InvalidCommit => "secp: malformed commit",
             Error::InvalidSignature => "secp: malformed signature",
             Error::InvalidSecretKey => "secp: malformed or out-of-range secret key",
             Error::InvalidRecoveryId => "secp: bad recovery id",
