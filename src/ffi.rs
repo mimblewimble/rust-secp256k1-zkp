@@ -84,7 +84,7 @@ impl PublicKey {
     /// Create a new (zeroed) public key usable for the FFI interface
     pub fn new() -> PublicKey { PublicKey([0; 64]) }
     /// Create a new (uninitialized) public key usable for the FFI interface
-    pub unsafe fn blank() -> PublicKey { mem::uninitialized() }
+    pub unsafe fn blank() -> PublicKey { mem::MaybeUninit::uninit().assume_init() }
 }
 
 /// Library-internal representation of a Secp256k1 signature
@@ -114,21 +114,21 @@ impl Signature {
     /// Create a signature from raw data
     pub fn from_data(data: [u8; 64]) -> Signature { Signature(data) }
     /// Create a new (uninitialized) signature usable for the FFI interface
-    pub unsafe fn blank() -> Signature { mem::uninitialized() }
+    pub unsafe fn blank() -> Signature { mem::MaybeUninit::uninit().assume_init() }
 }
 
 impl RecoverableSignature {
     /// Create a new (zeroed) signature usable for the FFI interface
     pub fn new() -> RecoverableSignature { RecoverableSignature([0; 65]) }
     /// Create a new (uninitialized) signature usable for the FFI interface
-    pub unsafe fn blank() -> RecoverableSignature { mem::uninitialized() }
+    pub unsafe fn blank() -> RecoverableSignature { mem::MaybeUninit::uninit().assume_init() }
 }
 
 impl AggSigPartialSignature {
     /// Create a new (zeroed) aggsig partial signature usable for the FFI interface
     pub fn new() -> AggSigPartialSignature { AggSigPartialSignature([0; 32]) }
     /// Create a new (uninitialized) signature usable for the FFI interface
-    pub unsafe fn blank() -> AggSigPartialSignature { mem::uninitialized() }
+    pub unsafe fn blank() -> AggSigPartialSignature { mem::MaybeUninit::uninit().assume_init() }
 }
 
 /// Library-internal representation of an ECDH shared secret
@@ -141,7 +141,7 @@ impl SharedSecret {
     /// Create a new (zeroed) signature usable for the FFI interface
     pub fn new() -> SharedSecret { SharedSecret([0; 32]) }
     /// Create a new (uninitialized) signature usable for the FFI interface
-    pub unsafe fn blank() -> SharedSecret { mem::uninitialized() }
+    pub unsafe fn blank() -> SharedSecret { mem::MaybeUninit::uninit().assume_init() }
 }
 
 

@@ -31,7 +31,7 @@ variables:
 jobs:
 - job: linux
   pool:
-    vmImage: ubuntu-16.04
+    vmImage: ubuntu-latest
   strategy:
     matrix:
       stable:
@@ -52,7 +52,7 @@ jobs:
       displayName: Test
 - job: macos
   pool:
-    vmImage: macos-10.14
+    vmImage: macos-latest
   strategy:
     matrix:
       stable:
@@ -73,7 +73,7 @@ jobs:
       displayName: Test
 - job: windows
   pool:
-    vmImage: windows-2019
+    vmImage: windows-latest
   strategy:
     matrix:
       stable:
