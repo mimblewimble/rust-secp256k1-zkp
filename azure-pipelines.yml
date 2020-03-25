@@ -42,10 +42,6 @@ jobs:
         rustup_toolchain: nightly
   steps:
     - script: |
-        curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain $RUSTUP_TOOLCHAIN
-        echo "##vso[task.setvariable variable=PATH;]$PATH:$HOME/.cargo/bin"
-      displayName: Install Rust
-    - script: |
         git submodule update --init 
         cargo build
         cargo build --release
@@ -56,7 +52,7 @@ jobs:
       displayName: Test
 - job: macos
   pool:
-    vmImage: macos-10.13
+    vmImage: macos-10.14
   strategy:
     matrix:
       stable:
@@ -66,10 +62,6 @@ jobs:
       nightly:
         rustup_toolchain: nightly
   steps:
-    - script: |
-        curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain $RUSTUP_TOOLCHAIN
-        echo "##vso[task.setvariable variable=PATH;]$PATH:$HOME/.cargo/bin"
-      displayName: Install Rust
     - script: |
         git submodule update --init 
         cargo build
@@ -81,7 +73,7 @@ jobs:
       displayName: Test
 - job: windows
   pool:
-    vmImage: vs2017-win2016
+    vmImage: windows-2019
   strategy:
     matrix:
       stable:
@@ -91,11 +83,6 @@ jobs:
       nightly:
         rustup_toolchain: nightly
   steps:
-    - script: |
-        curl -sSf -o rustup-init.exe https://win.rustup.rs
-        rustup-init.exe -y --default-toolchain %RUSTUP_TOOLCHAIN%
-        echo "##vso[task.setvariable variable=PATH;]%PATH%;%USERPROFILE%\.cargo\bin"
-      displayName: Install Rust
     - script: |
         git submodule update --init
         cargo build
