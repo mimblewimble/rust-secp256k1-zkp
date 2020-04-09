@@ -96,15 +96,14 @@ impl Commitment {
 	}
 
 	/// Creates from a pubkey
-	pub fn from_pubkey(secp: &Secp256k1, pk: &key::PublicKey) -> Result<Commitment, Error> {
-		let mut commit_i = [0; constants::PEDERSEN_COMMITMENT_SIZE_INTERNAL];
-		let res = unsafe {
-			ffi::secp256k1_pubkey_to_pedersen_commitment(secp.ctx, commit_i.as_mut_ptr(), &pk.0 as *const _)
-		};
-		if res == 1 {
-			Ok(secp.commit_ser(commit_i)?)
-		} else {
-			Err(InvalidCommit)
+	pub fn from_pubkey(secp: &Secp256k1, pk: &key::PublicKey) -> Result<Self, Error> {
+		unsafe {
+			let mut commit = Self::blank();
+			if ffi::secp256k1_pubkey_to_pedersen_commitment(secp.ctx, commit.as_mut_ptr(), &pk.0) == 1 {
+				Ok(commit)
+			} else {
+				Err(InvalidCommit)
+			}
 		}
 	}
 
