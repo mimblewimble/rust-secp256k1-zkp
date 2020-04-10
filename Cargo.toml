@@ -6,7 +6,7 @@ authors = [ "Grin Developers <mimblewimble@lists.launchpad.net>",
 						"Dawid Ciężarkiewicz <dpc@ucore.info>",
             "Andrew Poelstra <apoelstra@wpsoftware.net>" ]
 license = "CC0-1.0"
-homepage = "https://grin-tech.org"
+homepage = "https://grin.mw"
 repository = "https://github.com/mimblewimble/rust-secp256k1/"
 description = "Grin's fork with Zero-Knowledge extensions of Rust bindings for Pieter Wuille's `libsecp256k1` library. Implements ECDSA for the SECG elliptic curve group secp256k1 and related utilities."
 keywords = [ "crypto", "secp256k1", "grin", "bitcoin", "zero-knowledge" ]
