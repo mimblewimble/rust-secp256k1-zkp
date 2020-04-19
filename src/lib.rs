@@ -1050,19 +1050,39 @@ mod tests {
     }
 }
 
+
 #[cfg(all(test, feature = "unstable"))]
 mod benches {
-    use rand::{Rng, thread_rng};
+    use rand::{thread_rng, RngCore};
     use test::{Bencher, black_box};
 
     use super::{Secp256k1, Message};
 
     #[bench]
     pub fn generate(bh: &mut Bencher) {
-        struct CounterRng(u32);
-        impl Rng for CounterRng {
-            fn next_u32(&mut self) -> u32 { self.0 += 1; self.0 }
+        struct CounterRng(u64);
+        impl RngCore for CounterRng {
+            fn next_u32(&mut self) -> u32 {
+                self.next_u64() as u32
+            }
+
+            fn next_u64(&mut self) -> u64 {
+                self.0 += 1;
+                self.0
+            }
+
+            fn fill_bytes(&mut self, dest: &mut [u8]) {
+                for chunk in dest.chunks_mut(64/8) {
+                    let rand: [u8; 64/8] = unsafe {std::mem::transmute(self.next_u64())};
+                    chunk.copy_from_slice(&rand[..chunk.len()]);
+                }
+            }
+
+            fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), rand::Error> {
+                Ok(self.fill_bytes(dest))
+            }
         }
+
 
         let s = Secp256k1::new();
         let mut r = CounterRng(0);
@@ -1077,12 +1097,12 @@ mod benches {
     pub fn bench_sign(bh: &mut Bencher) {
         let s = Secp256k1::new();
         let mut msg = [0u8; 32];
-        thread_rng().fill(&mut msg);
+        thread_rng().fill_bytes(&mut msg);
         let msg = Message::from_slice(&msg).unwrap();
         let (sk, _) = s.generate_keypair(&mut thread_rng()).unwrap();
 
         bh.iter(|| {
-            let sig = s.sign(&msg, &sk).unwrap();
+            let sig = s.sign(&msg, &sk);
             black_box(sig);
         });
     }
@@ -1091,28 +1111,13 @@ mod benches {
     pub fn bench_verify(bh: &mut Bencher) {
         let s = Secp256k1::new();
         let mut msg = [0u8; 32];
-        thread_rng().fill(&mut msg);
+        thread_rng().fill_bytes(&mut msg);
         let msg = Message::from_slice(&msg).unwrap();
         let (sk, pk) = s.generate_keypair(&mut thread_rng()).unwrap();
         let sig = s.sign(&msg, &sk).unwrap();
 
         bh.iter(|| {
             let res = s.verify(&msg, &sig, &pk).unwrap();
-            black_box(res);
-        });
-    }
-
-    #[bench]
-    pub fn bench_recover(bh: &mut Bencher) {
-        let s = Secp256k1::new();
-        let mut msg = [0u8; 32];
-        thread_rng().fill(&mut msg);
-        let msg = Message::from_slice(&msg).unwrap();
-        let (sk, _) = s.generate_keypair(&mut thread_rng()).unwrap();
-        let sig = s.sign_recoverable(&msg, &sk).unwrap();
-
-        bh.iter(|| {
-            let res = s.recover(&msg, &sig).unwrap();
             black_box(res);
         });
     }
