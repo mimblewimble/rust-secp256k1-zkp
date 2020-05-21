@@ -1,0 +1,32 @@
+
+[package]
+name = "grin_secp256k1zkp-fuzz"
+version = "0.0.0"
+authors = ["Automatically generated"]
+publish = false
+edition = "2018"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.3"
+
+[dependencies.grin_secp256k1zkp]
+path = ".."
+
+# Prevent this from interfering with workspaces
+[workspace]
+members = ["."]
+
+[[bin]]
+name = "fuzz_sign"
+path = "fuzz_targets/fuzz_sign.rs"
+
+[[bin]]
+name = "fuzz_ecdh"
+path = "fuzz_targets/fuzz_ecdh.rs"
+
+[[bin]]
+name = "fuzz_aggsig"
+path = "fuzz_targets/fuzz_aggsig.rs"
