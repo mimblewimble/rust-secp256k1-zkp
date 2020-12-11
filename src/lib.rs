@@ -50,7 +50,7 @@ pub extern crate rand;
 extern crate zeroize;
 
 use libc::size_t;
-use std::{error, fmt, ops, ptr};
+use std::{fmt, ops, ptr};
 use rand::Rng;
 
 #[macro_use]
@@ -479,17 +479,8 @@ pub enum Error {
     PartialSigFailure,
 }
 
-// Passthrough Debug to Display, since errors should be user-visible
-impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        f.write_str(&self.to_string())
-    }
-}
-
-impl error::Error for Error {
-    fn cause(&self) -> Option<&dyn error::Error> { None }
-
-    fn description(&self) -> &str {
+impl Error {
+    fn as_str(&self) -> &str {
         match *self {
             Error::IncapableContext => "secp: context does not have sufficient capabilities",
             Error::IncorrectSignature => "secp: signature failed verification",
@@ -505,6 +496,18 @@ impl error::Error for Error {
         }
     }
 }
+
+// Passthrough Debug to Display, since errors should be user-visible
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        f.write_str(self.as_str())
+    }
+}
+
+impl std::error::Error for Error {
+    fn description(&self) -> &str { self.as_str() }
+}
+
 
 /// The secp256k1 engine, used to execute all signature operations
 pub struct Secp256k1 {
