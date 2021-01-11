@@ -117,6 +117,23 @@ impl Signature {
     pub unsafe fn blank() -> Signature { mem::MaybeUninit::uninit().assume_init() }
 }
 
+#[cfg(feature = "arbitrary")]
+impl arbitrary::Arbitrary for Signature
+{
+    fn arbitrary(u: &mut arbitrary::Unstructured<'_>) -> arbitrary::Result<Self> {
+        let mut sig_bytes = [0 as c_uchar; 64];
+
+        let iter = u.arbitrary_iter::<c_uchar>()?;
+
+        for (i, byte) in iter.enumerate() {
+            if i == 64 { break; }
+            sig_bytes[i] = byte?;
+        }
+
+        Ok(Signature(sig_bytes))
+    }
+}
+
 impl RecoverableSignature {
     /// Create a new (zeroed) signature usable for the FFI interface
     pub fn new() -> RecoverableSignature { RecoverableSignature([0; 65]) }

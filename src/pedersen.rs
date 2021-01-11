@@ -122,6 +122,23 @@ impl Commitment {
 
 }
 
+#[cfg(feature = "arbitrary")]
+impl arbitrary::Arbitrary for Commitment
+{
+    fn arbitrary(u: &mut arbitrary::Unstructured<'_>) -> arbitrary::Result<Self> {
+        let mut com_bytes = [0u8; constants::PEDERSEN_COMMITMENT_SIZE];
+
+        let iter = u.arbitrary_iter::<u8>()?;
+
+        for (i, byte) in iter.enumerate() {
+            if i == constants::PEDERSEN_COMMITMENT_SIZE { break; }
+            com_bytes[i] = byte?;
+        }
+
+        Ok(Commitment(com_bytes))
+    }
+}
+
 /// A range proof. Typically much larger in memory that the above (~5k).
 #[derive(Copy)]
 pub struct RangeProof {
@@ -247,6 +264,25 @@ impl RangeProof {
 	pub fn len(&self) -> usize {
 		self.plen
 	}
+}
+
+#[cfg(feature = "arbitrary")]
+impl arbitrary::Arbitrary for RangeProof
+{
+    fn arbitrary(u: &mut arbitrary::Unstructured<'_>) -> arbitrary::Result<Self> {
+        let mut proof_bytes = [0u8; constants::MAX_PROOF_SIZE];
+        let mut plen = 0;
+
+        let iter = u.arbitrary_iter::<u8>()?;
+
+        for (i, byte) in iter.enumerate() {
+            if i == constants::MAX_PROOF_SIZE { plen = i; break; }
+            proof_bytes[i] = byte?;
+            plen = i + 1;
+        }
+
+        Ok(RangeProof{ proof: proof_bytes, plen: plen })
+    }
 }
 
 /// A message included in a range proof.

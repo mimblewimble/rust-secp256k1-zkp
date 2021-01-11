@@ -71,6 +71,7 @@ pub struct RecoveryId(i32);
 
 /// An ECDSA signature
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct Signature(ffi::Signature);
 
 impl std::convert::AsRef<[u8]> for Signature {
@@ -423,6 +424,7 @@ impl ops::Index<ops::RangeFull> for Signature {
 }
 
 /// A (hashed) message input to an ECDSA signature
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct Message([u8; constants::MESSAGE_SIZE]);
 impl Copy for Message {}
 impl_array_newtype!(Message, u8, constants::MESSAGE_SIZE);
