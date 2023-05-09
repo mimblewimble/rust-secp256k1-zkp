@@ -258,6 +258,39 @@ pub fn add_signatures_single(
 	Ok(retsig)
 }
 
+/// Subtraction of partial signature from a signature
+/// Returns: Ok((Signature, None)) on success if the resulting signature has only one possibility
+///          Ok((Signature, Signature)) on success if the resulting signature could be one of either possiblity
+/// In:
+/// sig: completed signature from which to subtact a partial
+/// partial_sig: the partial signature to subtract
+pub fn subtract_partial_signature(
+	secp: &Secp256k1,
+	sig: &Signature,
+	partial_sig: &Signature,
+) -> Result<(Signature, Option<Signature>), Error> {
+	let mut ret_partsig = Signature::from(ffi::Signature::new());
+	let mut ret_partsig_alt = Signature::from(ffi::Signature::new());
+	let retval = unsafe {
+		ffi::secp256k1_aggsig_subtract_partial_signature(
+			secp.ctx,
+			ret_partsig.as_mut_ptr(),
+			ret_partsig_alt.as_mut_ptr(),
+			sig.as_ptr(),
+			partial_sig.as_ptr(),
+		)
+	};
+
+	if retval == 1 {
+		Ok((ret_partsig, None))
+	} else if retval == 2 {
+		Ok((ret_partsig, Some(ret_partsig_alt)))
+	} else {
+		Err(Error::InvalidSignature)
+	}
+}
+
+
 /// Manages an instance of an aggsig multisig context, and provides all methods
 /// to act on that context
 #[derive(Clone, Debug)]
@@ -396,7 +429,8 @@ mod tests {
 		add_signatures_single, export_secnonce_single, sign_single, verify_single, verify_batch,
 		AggSigContext, Secp256k1,
 	};
-	use crate::ffi;
+	use crate::aggsig::subtract_partial_signature;
+use crate::ffi;
 	use crate::key::{PublicKey, SecretKey};
 	use rand::{thread_rng, Rng};
 	use crate::ContextFlag;
@@ -756,6 +790,32 @@ mod tests {
 				false,
 			);
 			assert!(result == true);
+
+			// Subtract sig1 from final sig
+			let (res_sig, res_sig_opt) = subtract_partial_signature(&secp, &final_sig, &sig1).unwrap();
+			let mut sig_matches = false;
+			if res_sig == sig2 {
+				sig_matches = true;
+			} else if let Some(r) = res_sig_opt {
+				if r == sig2 {
+					sig_matches = true;
+				}
+			}
+			assert!(sig_matches == true);
+
+			// Subtract sig2 from final sig for good measure
+			let (res_sig, res_sig_opt) = subtract_partial_signature(&secp, &final_sig, &sig2).unwrap();
+			sig_matches = false;
+			if res_sig == sig1 {
+				sig_matches = true;
+			} else if let Some(r) = res_sig_opt {
+				if r == sig1 {
+					sig_matches = true;
+				}
+			}
+			assert!(sig_matches == true);
+
+
 		}
 	}
 }
