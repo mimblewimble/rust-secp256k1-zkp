@@ -281,12 +281,11 @@ pub fn subtract_partial_signature(
 		)
 	};
 
-	if retval == 1 {
-		Ok((ret_partsig, None))
-	} else if retval == 2 {
-		Ok((ret_partsig, Some(ret_partsig_alt)))
-	} else {
-		Err(Error::InvalidSignature)
+	match retval {
+		-1 => Err(Error::SigSubtractionFailure),
+		1 => Ok((ret_partsig, None)),
+		2 => Ok((ret_partsig, Some(ret_partsig_alt))),
+		_ => Err(Error::InvalidSignature)
 	}
 }
 
