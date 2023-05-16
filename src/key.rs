@@ -150,6 +150,24 @@ impl SecretKey {
     }
 }
 
+#[cfg(feature = "arbitrary")]
+impl arbitrary::Arbitrary for SecretKey
+{
+    fn arbitrary(u: &mut arbitrary::Unstructured<'_>) -> arbitrary::Result<Self> {
+        let mut sec_bytes = [0_u8; constants::SECRET_KEY_SIZE];
+
+        let s = Secp256k1::new();
+        let iter = u.arbitrary_iter::<u8>()?;
+
+        for (i, byte) in iter.enumerate() {
+            if i == constants::SECRET_KEY_SIZE { break; }
+            sec_bytes[i] = byte?;
+        }
+
+        SecretKey::from_slice(&s, &sec_bytes).map_err(|_| arbitrary::Error::IncorrectFormat)
+    }
+}
+
 impl PublicKey {
     /// Creates a new zeroed out public key
     #[inline]
@@ -399,6 +417,24 @@ impl Serialize for PublicKey {
     {
         let secp = Secp256k1::with_caps(crate::ContextFlag::None);
         (&self.serialize_vec(&secp, true)[..]).serialize(s)
+    }
+}
+
+#[cfg(feature = "arbitrary")]
+impl arbitrary::Arbitrary for PublicKey
+{
+    fn arbitrary(u: &mut arbitrary::Unstructured<'_>) -> arbitrary::Result<Self> {
+        let mut pub_bytes = [0_u8; constants::PUBLIC_KEY_SIZE];
+
+        let s = Secp256k1::new();
+        let iter = u.arbitrary_iter::<u8>()?;
+
+        for (i, byte) in iter.enumerate() {
+            if i == constants::PUBLIC_KEY_SIZE { break; }
+            pub_bytes[i] = byte?;
+        }
+
+        PublicKey::from_slice(&s, &pub_bytes).map_err(|_| arbitrary::Error::IncorrectFormat)
     }
 }
 
