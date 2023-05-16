@@ -477,6 +477,8 @@ pub enum Error {
     InvalidRangeProof,
     /// Error creating partial signature
     PartialSigFailure,
+    /// Failure subtracting two signatures
+    SigSubtractionFailure,
 }
 
 impl Error {
@@ -493,6 +495,7 @@ impl Error {
             Error::IncorrectCommitSum => "secp: invalid pedersen commitment sum",
             Error::InvalidRangeProof => "secp: invalid range proof",
             Error::PartialSigFailure => "secp: partial sig (aggsig) failure",
+            Error::SigSubtractionFailure => "secp: subtraction (aggsig) did not result in any valid signatures",
         }
     }
 }

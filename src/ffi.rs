@@ -333,7 +333,15 @@ extern "C" {
                                                   num_sigs: size_t,
                                                   pubnonce_total: *const PublicKey)
                                                       -> c_int;
-    // EC
+
+    pub fn secp256k1_aggsig_subtract_partial_signature(cx: *const Context,
+                                                  ret_partsig: *mut Signature,
+                                                  ret_partsig_alt: *mut Signature,
+                                                  sig: *const Signature,
+                                                  part_sig: *const Signature)
+                                                      -> c_int;
+
+     // EC
     pub fn secp256k1_ec_seckey_verify(cx: *const Context,
                                       sk: *const c_uchar) -> c_int;
 
