@@ -26,6 +26,7 @@ unstable = []
 default = []
 bullet-proof-sizing = []
 dev = ["clippy"]
+lowmemory = []
 
 [dependencies]
 arrayvec = "0.3"

@@ -21,21 +21,39 @@
 #![deny(unused_mut)]
 #![warn(missing_docs)]
 
+use std::env;
 fn main() {
+    if cfg!(feature = "external-symbols") {
+        println!("cargo:rustc-link-lib=static=secp256k1-zkp");
+        return;
+    }
+
+    // Check whether we can use 64-bit compilation
+    let use_64bit_compilation = if env::var("CARGO_CFG_TARGET_POINTER_WIDTH").unwrap() == "64" {
+        let check = cc::Build::new().file("depend/check_uint128_t.c")
+                                    .cargo_metadata(false)
+                                    .try_compile("check_uint128_t")
+                                    .is_ok();
+        if !check {
+            println!("cargo:warning=Compiling in 32-bit mode on a 64-bit architecture due to lack of uint128_t support.");
+        }
+        check
+    } else {
+        false
+    };
+
+    // Actual build
     let mut base_config = cc::Build::new();
     base_config.include("depend/secp256k1-zkp/")
                .include("depend/secp256k1-zkp/include")
                .include("depend/secp256k1-zkp/src")
-               .flag("-g")
+               .flag_if_supported("-Wno-unused-function") // some ecmult stuff is defined but not used upstream
+               .define("SECP256K1_BUILD", Some("1"))
                // TODO these three should be changed to use libgmp, at least until secp PR 290 is merged
                .define("USE_NUM_NONE", Some("1"))
                .define("USE_FIELD_INV_BUILTIN", Some("1"))
                .define("USE_SCALAR_INV_BUILTIN", Some("1"))
-               // TODO these should use 64-bit variants on 64-bit systems
-               .define("USE_FIELD_10X26", Some("1"))
-               .define("USE_SCALAR_8X32", Some("1"))
                .define("USE_ENDOMORPHISM", Some("1"))
-               // These all are OK.
                .define("ENABLE_MODULE_ECDH", Some("1"))
                .define("ENABLE_MODULE_GENERATOR", Some("1"))
                .define("ENABLE_MODULE_RECOVERY", Some("1"))
@@ -43,6 +61,27 @@ fn main() {
                .define("ENABLE_MODULE_BULLETPROOF", Some("1"))
                .define("ENABLE_MODULE_AGGSIG", Some("1"))
                .define("ENABLE_MODULE_SCHNORRSIG", Some("1"));
+
+    if cfg!(feature = "lowmemory") {
+        base_config.define("ECMULT_WINDOW_SIZE", Some("4")); // A low-enough value to consume neglible memory
+    } else {
+        base_config.define("ECMULT_WINDOW_SIZE", Some("15")); // This is the default in the configure file (`auto`)
+    }
+
+    if let Ok(target_endian) = env::var("CARGO_CFG_TARGET_ENDIAN") {
+        if target_endian == "big" {
+            base_config.define("WORDS_BIGENDIAN", Some("1"));
+        }
+    }
+
+    if use_64bit_compilation {
+        base_config.define("USE_FIELD_5X52", Some("1"))
+                   .define("USE_SCALAR_4X64", Some("1"))
+                   .define("HAVE___INT128", Some("1"));
+    } else {
+        base_config.define("USE_FIELD_10X26", Some("1"))
+                   .define("USE_SCALAR_8X32", Some("1"));
+    }
 
     // secp256k1-zkp
     base_config.file("depend/secp256k1-zkp/contrib/lax_der_parsing.c")

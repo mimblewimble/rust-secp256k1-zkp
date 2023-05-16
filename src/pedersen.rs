@@ -2026,3 +2026,31 @@ mod tests {
 		assert_eq!(errs, 0);
 	}
 }
+
+
+
+
+#[cfg(all(test, feature = "unstable"))]
+mod benches {
+    use rand::thread_rng;
+    use test::{Bencher, black_box};
+	use super::{ContextFlag, SecretKey, Secp256k1};
+
+    #[bench]
+    pub fn bench_bullet_proof_verification(bh: &mut Bencher) {
+		// Test Bulletproofs without message
+		let secp = Secp256k1::with_caps(ContextFlag::Commit);
+		let blinding = SecretKey::new(&secp, &mut thread_rng());
+		let value = 12345678;
+		let commit = secp.commit(value, blinding.clone()).unwrap();
+		let bullet_proof = secp.bullet_proof(value, blinding.clone(), blinding.clone(), blinding.clone(), None, None);
+        bh.iter( || {
+			let proof_range = secp.verify_bullet_proof(commit, bullet_proof, None).unwrap();
+			assert_eq!(proof_range.min, 0);
+        });
+    }
+}
+
+
+
+
