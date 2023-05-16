@@ -792,29 +792,11 @@ use crate::ffi;
 
 			// Subtract sig1 from final sig
 			let (res_sig, res_sig_opt) = subtract_partial_signature(&secp, &final_sig, &sig1).unwrap();
-			let mut sig_matches = false;
-			if res_sig == sig2 {
-				sig_matches = true;
-			} else if let Some(r) = res_sig_opt {
-				if r == sig2 {
-					sig_matches = true;
-				}
-			}
-			assert!(sig_matches == true);
+			assert!(res_sig == sig2 || res_sig_opt == Some(sig2));
 
 			// Subtract sig2 from final sig for good measure
 			let (res_sig, res_sig_opt) = subtract_partial_signature(&secp, &final_sig, &sig2).unwrap();
-			sig_matches = false;
-			if res_sig == sig1 {
-				sig_matches = true;
-			} else if let Some(r) = res_sig_opt {
-				if r == sig1 {
-					sig_matches = true;
-				}
-			}
-			assert!(sig_matches == true);
-
-
+			assert!(res_sig == sig1 || res_sig_opt == Some(sig1));
 		}
 	}
 }
