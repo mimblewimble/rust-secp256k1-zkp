@@ -497,68 +497,6 @@ mod test {
     }
 
     #[test]
-    fn test_bad_deserialize() {
-        use std::io::Cursor;
-        use crate::serialize::{json, Decodable};
-
-        let zero31 = "[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]".as_bytes();
-        let json31 = json::Json::from_reader(&mut Cursor::new(zero31)).unwrap();
-        let zero32 = "[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]".as_bytes();
-        let json32 = json::Json::from_reader(&mut Cursor::new(zero32)).unwrap();
-        let zero65 = "[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]".as_bytes();
-        let json65 = json::Json::from_reader(&mut Cursor::new(zero65)).unwrap();
-        let string = "\"my key\"".as_bytes();
-        let json = json::Json::from_reader(&mut Cursor::new(string)).unwrap();
-
-        // Invalid length
-        let mut decoder = json::Decoder::new(json31.clone());
-        assert!(<PublicKey as Decodable>::decode(&mut decoder).is_err());
-        let mut decoder = json::Decoder::new(json31.clone());
-        assert!(<SecretKey as Decodable>::decode(&mut decoder).is_err());
-        let mut decoder = json::Decoder::new(json32.clone());
-        assert!(<PublicKey as Decodable>::decode(&mut decoder).is_err());
-        let mut decoder = json::Decoder::new(json32.clone());
-        assert!(<SecretKey as Decodable>::decode(&mut decoder).is_ok());
-        let mut decoder = json::Decoder::new(json65.clone());
-        assert!(<PublicKey as Decodable>::decode(&mut decoder).is_err());
-        let mut decoder = json::Decoder::new(json65.clone());
-        assert!(<SecretKey as Decodable>::decode(&mut decoder).is_err());
-
-        // Syntax error
-        let mut decoder = json::Decoder::new(json.clone());
-        assert!(<PublicKey as Decodable>::decode(&mut decoder).is_err());
-        let mut decoder = json::Decoder::new(json.clone());
-        assert!(<SecretKey as Decodable>::decode(&mut decoder).is_err());
-    }
-
-    #[test]
-    fn test_serialize() {
-        use std::io::Cursor;
-
-        macro_rules! round_trip (
-            ($var:ident) => ({
-                let start = $var;
-                let mut encoded = String::new();
-                {
-                    let mut encoder = json::Encoder::new(&mut encoded);
-                    start.encode(&mut encoder).unwrap();
-                }
-                let json = json::Json::from_reader(&mut Cursor::new(encoded.as_bytes())).unwrap();
-                let mut decoder = json::Decoder::new(json);
-                let decoded = Decodable::decode(&mut decoder);
-                assert_eq!(Ok(Some(start)), decoded);
-            })
-        );
-
-        let s = Secp256k1::new();
-        for _ in 0..500 {
-            let (sk, pk) = s.generate_keypair(&mut thread_rng()).unwrap();
-            round_trip!(sk);
-            round_trip!(pk);
-        }
-    }
-
-    #[test]
     fn test_bad_serde_deserialize() {
         use serde::Deserialize;
         use crate::json;
