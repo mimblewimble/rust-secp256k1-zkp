@@ -18,7 +18,6 @@
 use std::marker;
 use arrayvec::ArrayVec;
 use rand::Rng;
-use crate::serialize::{Decoder, Decodable, Encoder, Encodable};
 use serde::{Serialize, Deserialize, Serializer, Deserializer};
 
 use super::{Secp256k1, ContextFlag};
@@ -288,35 +287,6 @@ impl PublicKey {
     }
 }
 
-impl Decodable for PublicKey {
-    fn decode<D: Decoder>(d: &mut D) -> Result<PublicKey, D::Error> {
-        d.read_seq(|d, len| {
-            let s = Secp256k1::with_caps(crate::ContextFlag::None);
-            if len == constants::UNCOMPRESSED_PUBLIC_KEY_SIZE {
-                unsafe {
-                    use std::mem;
-                    let mut ret: [u8; constants::UNCOMPRESSED_PUBLIC_KEY_SIZE] = mem::MaybeUninit::uninit().assume_init();
-                    for i in 0..len {
-                        ret[i] = d.read_seq_elt(i, |d| Decodable::decode(d))?;
-                    }
-                    PublicKey::from_slice(&s, &ret).map_err(|_| d.error("invalid public key"))
-                }
-            } else if len == constants::COMPRESSED_PUBLIC_KEY_SIZE {
-                unsafe {
-                    use std::mem;
-                    let mut ret: [u8; constants::COMPRESSED_PUBLIC_KEY_SIZE] = mem::MaybeUninit::uninit().assume_init();
-                    for i in 0..len {
-                        ret[i] = d.read_seq_elt(i, |d| Decodable::decode(d))?;
-                    }
-                    PublicKey::from_slice(&s, &ret).map_err(|_| d.error("invalid public key"))
-                }
-            } else {
-                Err(d.error("Invalid length"))
-            }
-        })
-    }
-}
-
 /// Creates a new public key from a FFI public key
 impl From<ffi::PublicKey> for PublicKey {
     #[inline]
@@ -325,13 +295,6 @@ impl From<ffi::PublicKey> for PublicKey {
     }
 }
 
-
-impl Encodable for PublicKey {
-    fn encode<S: Encoder>(&self, s: &mut S) -> Result<(), S::Error> {
-        let secp = Secp256k1::with_caps(crate::ContextFlag::None);
-        self.serialize_vec(&secp, true).encode(s)
-    }
-}
 
 impl<'de> Deserialize<'de> for PublicKey {
     fn deserialize<D>(d: D) -> Result<PublicKey, D::Error>
@@ -571,7 +534,6 @@ mod test {
     #[test]
     fn test_serialize() {
         use std::io::Cursor;
-        use crate::serialize::{json, Decodable, Encodable};
 
         macro_rules! round_trip (
             ($var:ident) => ({

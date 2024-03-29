@@ -1,3 +1,4 @@
+#![allow(warnings)]
 // Bitcoin secp256k1 bindings
 // Written in 2014 by
 //   Dawid Ciężarkiewicz
@@ -40,7 +41,6 @@
 #[cfg(all(test, feature = "unstable"))] extern crate test;
 
 extern crate arrayvec;
-extern crate rustc_serialize as serialize;
 extern crate serde;
 extern crate serde_json as json;
 
@@ -708,7 +708,6 @@ impl Secp256k1 {
 #[cfg(test)]
 mod tests {
     use rand::{Rng, thread_rng};
-    use crate::serialize::hex::FromHex;
     use crate::key::{SecretKey, PublicKey};
     use super::constants;
     use super::{Secp256k1, Signature, RecoverableSignature, Message, RecoveryId, ContextFlag};
