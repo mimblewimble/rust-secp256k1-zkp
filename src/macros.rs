@@ -143,34 +143,6 @@ macro_rules! impl_array_newtype {
           }
         }
 
-        impl crate::serialize::Decodable for $thing {
-            fn decode<D: crate::serialize::Decoder>(d: &mut D) -> Result<$thing, D::Error> {
-                use crate::serialize::Decodable;
-
-                d.read_seq(|d, len| {
-                    if len != $len {
-                        Err(d.error("Invalid length"))
-                    } else {
-                        unsafe {
-                            use std::mem;
-                            let mut ret: [$ty; $len] = mem::MaybeUninit::uninit().assume_init();
-                            for i in 0..len {
-                                ret[i] = d.read_seq_elt(i, |d| Decodable::decode(d))?;
-                            }
-                            Ok($thing(ret))
-                        }
-                    }
-                })
-            }
-        }
-
-        impl crate::serialize::Encodable for $thing {
-            fn encode<S: crate::serialize::Encoder>(&self, s: &mut S)
-                                               -> Result<(), S::Error> {
-                self[..].encode(s)
-            }
-        }
-
         impl<'de> ::serde::Deserialize<'de> for $thing {
             fn deserialize<D>(d: D) -> Result<$thing, D::Error>
                 where D: ::serde::Deserializer<'de>
@@ -256,7 +228,7 @@ macro_rules! map_vec {
   ($thing:expr, $mapfn:expr ) => {
     $thing.iter()
       .map($mapfn)
-      .collect::<Vec<_>>();
+      .collect::<Vec<_>>()
   }
 }
 
