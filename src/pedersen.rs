@@ -146,7 +146,7 @@ impl Clone for RangeProof {
 			copy_nonoverlapping(
 				self.proof.as_ptr(),
 				ret.as_mut_ptr(),
-				mem::size_of::<RangeProof>(),
+				self.plen,
 			);
 			RangeProof {
 				proof: ret,
