@@ -40,7 +40,6 @@
 #[cfg(all(test, feature = "unstable"))] extern crate test;
 
 extern crate arrayvec;
-extern crate rustc_serialize as serialize;
 extern crate serde;
 extern crate serde_json as json;
 
@@ -130,7 +129,7 @@ impl Signature {
     pub fn from_compact(secp: &Secp256k1, data: &[u8]) -> Result<Signature, Error> {
         let mut ret = unsafe { ffi::Signature::blank() };
         if data.len() != 64 {
-            return Err(Error::InvalidSignature)
+            return Err(Error::InvalidSignature);
         }
 
         unsafe {
@@ -708,14 +707,24 @@ impl Secp256k1 {
 #[cfg(test)]
 mod tests {
     use rand::{Rng, thread_rng};
-    use crate::serialize::hex::FromHex;
     use crate::key::{SecretKey, PublicKey};
     use super::constants;
     use super::{Secp256k1, Signature, RecoverableSignature, Message, RecoveryId, ContextFlag};
     use super::Error::{InvalidMessage, InvalidPublicKey, IncorrectSignature, InvalidSignature,
                        IncapableContext};
 
-    macro_rules! hex (($hex:expr) => ($hex.from_hex().unwrap()));
+    macro_rules! hex {
+        ($hex:expr) => {{
+            let bytes = $hex.as_bytes();
+            let mut vec = Vec::new();
+            for i in (0..bytes.len()).step_by(2) {
+                let high = (bytes[i] as char).to_digit(16).unwrap();
+                let low = (bytes[i + 1] as char).to_digit(16).unwrap();
+                vec.push(((high << 4) + low) as u8);
+            }
+            vec
+        }};
+    }
 
     #[test]
     fn capabilities() {

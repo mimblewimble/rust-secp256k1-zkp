@@ -123,7 +123,7 @@ impl Commitment {
 }
 
 /// A range proof. Typically much larger in memory that the above (~5k).
-#[derive(Copy)]
+#[derive(Clone, Copy)]
 pub struct RangeProof {
 	/// The proof itself, at most 5134 bytes long
 	pub proof: [u8; constants::MAX_PROOF_SIZE],
@@ -134,25 +134,6 @@ pub struct RangeProof {
 impl PartialEq for RangeProof {
 	fn eq(&self, other: &Self) -> bool {
 		self.proof.as_ref() == other.proof.as_ref()
-	}
-}
-
-impl Clone for RangeProof {
-	#[inline]
-	fn clone(&self) -> RangeProof {
-		unsafe {
-			use std::ptr::copy_nonoverlapping;
-			let mut ret: [u8; constants::MAX_PROOF_SIZE] = mem::MaybeUninit::uninit().assume_init();
-			copy_nonoverlapping(
-				self.proof.as_ptr(),
-				ret.as_mut_ptr(),
-				mem::size_of::<RangeProof>(),
-			);
-			RangeProof {
-				proof: ret,
-				plen: self.plen,
-			}
-		}
 	}
 }
 
