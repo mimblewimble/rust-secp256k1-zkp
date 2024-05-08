@@ -237,7 +237,7 @@ impl PublicKey {
     /// Serialize the key as a byte-encoded pair of values. In compressed form
     /// the y-coordinate is represented by only a single bit, as x determines
     /// it up to one bit.
-    pub fn serialize_vec(&self, secp: &Secp256k1, compressed: bool) -> ArrayVec<[u8; constants::PUBLIC_KEY_SIZE]> {
+    pub fn serialize_vec(&self, secp: &Secp256k1, compressed: bool) -> ArrayVec<u8, {constants::PUBLIC_KEY_SIZE}> {
         let mut ret = ArrayVec::new();
 
         unsafe {
