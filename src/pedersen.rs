@@ -370,12 +370,13 @@ impl Secp256k1 {
 				c_out.as_mut_ptr(),
 				c_in.as_ptr(),
 			);
-            if ret == 1 {
-			    Ok(c_out)
-            } else {
-                Err(InvalidCommit)
-            }
-		}
+			if ret == 1 {
+				Ok(c_out)
+			} else {
+				Err(InvalidCommit)
+			}
+		};
+		c_out
 	}
 
 	/// Parse a commit into an internal representation
