@@ -69,7 +69,7 @@ impl_pretty_debug!(CommitmentInternal);
 impl CommitmentInternal {
 	/// Uninitialized commitment, use with caution
 	pub unsafe fn blank() -> CommitmentInternal {
-		mem::MaybeUninit::uninit().assume_init()
+		CommitmentInternal([0; constants::PEDERSEN_COMMITMENT_SIZE_INTERNAL])
 	}
 }
 
@@ -92,7 +92,7 @@ impl Commitment {
 
 	/// Uninitialized commitment, use with caution
 	unsafe fn blank() -> Commitment {
-		mem::MaybeUninit::uninit().assume_init()
+		Commitment([0; constants::PEDERSEN_COMMITMENT_SIZE])
 	}
 
 	/// Creates from a pubkey
@@ -365,14 +365,17 @@ impl Secp256k1 {
 	-> Result<CommitmentInternal, Error> {
 		let c_out = unsafe {
 			let mut c_out = CommitmentInternal::blank();
-			ffi::secp256k1_pedersen_commitment_parse(
+			let ret = ffi::secp256k1_pedersen_commitment_parse(
 				self.ctx,
 				c_out.as_mut_ptr(),
 				c_in.as_ptr(),
 			);
-			c_out
-		};
-		Ok(c_out)
+            if ret == 1 {
+			    Ok(c_out)
+            } else {
+                Err(InvalidCommit)
+            }
+		}
 	}
 
 	/// Parse a commit into an internal representation
@@ -453,8 +456,16 @@ impl Secp256k1 {
 	/// Taking vectors of positive and negative commitments as well as an
 	/// expected excess, verifies that it all sums to zero.
 	pub fn verify_commit_sum(&self, positive: Vec<Commitment>, negative: Vec<Commitment>) -> bool {
-		let pos = map_vec!(positive, |p| { self.commit_parse(p.0).unwrap() });
-		let neg = map_vec!(negative, |n| self.commit_parse(n.0).unwrap());
+		let pos = map_vec!(positive, |p| self.commit_parse(p.0));
+		let pos = match pos.into_iter().collect::<Result<Vec<_>, _>>() {
+			Ok(pos) => pos,
+			Err(_) => return false,
+		};
+		let neg = map_vec!(negative, |n| self.commit_parse(n.0));
+		let neg = match neg.into_iter().collect::<Result<Vec<_>, _>>() {
+			Ok(neg) => neg,
+			Err(_) => return false,
+		};
 		let pos = map_vec!(pos, |p| p.0.as_ptr());
 		let neg = map_vec!(neg, |n| n.0.as_ptr());
 		unsafe {
@@ -474,8 +485,12 @@ impl Secp256k1 {
 		positive: Vec<Commitment>,
 		negative: Vec<Commitment>,
 	) -> Result<Commitment, Error> {
-		let pos = map_vec!(positive, |p| self.commit_parse(p.0).unwrap());
-		let neg = map_vec!(negative, |n| self.commit_parse(n.0).unwrap());
+		let pos = map_vec!(positive, |p| self.commit_parse(p.0))
+			.into_iter()
+			.collect::<Result<Vec<_>, _>>()?;
+		let neg = map_vec!(negative, |n| self.commit_parse(n.0))
+			.into_iter()
+			.collect::<Result<Vec<_>, _>>()?;
 		let pos = map_vec!(pos, |p| p.0.as_ptr());
 		let neg = map_vec!(neg, |n| n.0.as_ptr());
 		let mut ret_i = unsafe { CommitmentInternal::blank() };
@@ -871,7 +886,13 @@ impl Secp256k1 {
 		let commit_vec;
 		let commit_ptr_vec;
 		let commit_ptr_vec_ptr = if commits.len() > 0 {
-			commit_vec = map_vec!(commits, |c| self.commit_parse(c.0).unwrap());
+			commit_vec = match map_vec!(commits, |c| self.commit_parse(c.0))
+				.into_iter()
+				.collect::<Result<Vec<_>, _>>()
+			{
+				Ok(v) => v,
+				Err(_) => return None,
+			};
 			commit_ptr_vec = map_vec!(commit_vec, |c| c.as_ptr());
 			commit_ptr_vec.as_ptr()
 		} else {
@@ -949,7 +970,7 @@ impl Secp256k1 {
 			None => (0, ptr::null()),
 		};
 
-		let commit = self.commit_parse(commit.0).unwrap();
+		let commit = self.commit_parse(commit.0)?;
 
 		let success = unsafe {
 			let scratch = ffi::secp256k1_scratch_space_create(self.ctx, SCRATCH_SPACE_SIZE);
@@ -997,7 +1018,9 @@ impl Secp256k1 {
 			constants::SINGLE_BULLET_PROOF_SIZE
 		};
 
-		let commit_vec = map_vec!(commits, |c| self.commit_parse(c.0).unwrap());
+		let commit_vec = map_vec!(commits, |c| self.commit_parse(c.0))
+			.into_iter()
+			.collect::<Result<Vec<_>, _>>()?;
 		let commit_vec = map_vec!(commit_vec, |c| c.as_ptr());
 		let proof_vec = map_vec!(proofs, |p| p.proof.as_ptr());
 		//		let min_values = vec![0; proofs.len()];
