@@ -40,32 +40,32 @@ pub type NonceFn = unsafe extern "C" fn(nonce32: *mut c_uchar,
                                         msg32: *const c_uchar,
                                         key32: *const c_uchar,
                                         algo16: *const c_uchar,
-                                        attempt: c_uint,
-                                        data: *const c_void);
+                                        data: *mut c_void,
+                                        attempt: c_uint);
 
 
 /// A Secp256k1 context, containing various precomputed values and such
 /// needed to do elliptic curve computations. If you create one of these
 /// with `secp256k1_context_create` you MUST destroy it with
 /// `secp256k1_context_destroy`, or else you will have a memory leak.
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 #[repr(C)] pub struct Context(c_int);
 
 /// Secp256k1 aggsig context. As above, needs to be destroyed with
 /// `secp256k1_aggsig_context_destroy`
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 #[repr(C)] pub struct AggSigContext(c_int);
 
 /// Secp256k1 scratch space
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 #[repr(C)] pub struct ScratchSpace(c_int);
 
 /// Secp256k1 bulletproof generators
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 #[repr(C)] pub struct BulletproofGenerators(c_int);
 
 /// Generator
-#[repr(C)] 
+#[repr(C)]
 pub struct Generator(pub [c_uchar; 64]);
 impl Copy for Generator {}
 impl_array_newtype!(Generator, c_uchar, 64);
@@ -141,7 +141,7 @@ extern "C" {
     // Contexts
     pub fn secp256k1_context_create(flags: c_uint) -> *mut Context;
 
-    pub fn secp256k1_context_clone(cx: *mut Context) -> *mut Context;
+    pub fn secp256k1_context_clone(cx: *const Context) -> *mut Context;
 
     pub fn secp256k1_context_destroy(cx: *mut Context);
 
@@ -149,7 +149,7 @@ extern "C" {
                                        seed32: *const c_uchar)
                                        -> c_int;
     // Scratch space
-    pub fn secp256k1_scratch_space_create(cx: *mut Context,
+    pub fn secp256k1_scratch_space_create(cx: *const Context,
                                           max_size: size_t)
                                           -> *mut ScratchSpace;
 
@@ -173,7 +173,7 @@ extern "C" {
                                      input: *const c_uchar, in_len: size_t)
                                      -> c_int;
 
-    pub fn secp256k1_ec_pubkey_serialize(cx: *const Context, output: *const c_uchar,
+    pub fn secp256k1_ec_pubkey_serialize(cx: *const Context, output: *mut c_uchar,
                                          out_len: *mut size_t, pk: *const PublicKey,
                                          compressed: c_uint)
                                          -> c_int;
@@ -191,11 +191,11 @@ extern "C" {
                                          input: *const c_uchar, in_len: size_t)
                                          -> c_int;
 
-    pub fn secp256k1_ecdsa_signature_serialize_der(cx: *const Context, output: *const c_uchar,
+    pub fn secp256k1_ecdsa_signature_serialize_der(cx: *const Context, output: *mut c_uchar,
                                                    out_len: *mut size_t, sig: *const Signature)
                                                    -> c_int;
 
-    pub fn secp256k1_ecdsa_signature_serialize_compact(cx: *const Context, output64: *const c_uchar,
+    pub fn secp256k1_ecdsa_signature_serialize_compact(cx: *const Context, output64: *mut c_uchar,
                                                        sig: *const Signature)
                                                        -> c_int;
 
@@ -203,7 +203,7 @@ extern "C" {
                                                                input64: *const c_uchar, recid: c_int)
                                                                -> c_int;
 
-    pub fn secp256k1_ecdsa_recoverable_signature_serialize_compact(cx: *const Context, output64: *const c_uchar,
+    pub fn secp256k1_ecdsa_recoverable_signature_serialize_compact(cx: *const Context, output64: *mut c_uchar,
                                                                    recid: *mut c_int, sig: *const RecoverableSignature)
                                                                    -> c_int;
 
@@ -304,7 +304,7 @@ extern "C" {
                                           pk: *const PublicKey,
                                           pk_total: *const PublicKey,
                                           extra_pubkey: *const PublicKey,
-                                          is_partial: c_uint)
+                                          is_partial: c_int)
                                            -> c_int;
 
     pub fn secp256k1_schnorrsig_verify_batch(cx: *const Context,
@@ -362,7 +362,7 @@ extern "C" {
     pub fn secp256k1_ec_pubkey_combine(cx: *const Context,
                                        out: *mut PublicKey,
                                        ins: *const *const PublicKey,
-                                       n: c_int)
+                                       n: size_t)
                                        -> c_int;
 
     pub fn secp256k1_ec_privkey_tweak_inv(cx: *const Context,
@@ -429,7 +429,7 @@ extern "C" {
 	// calculates an additional blinding value that adds to zero.
 	pub fn secp256k1_pedersen_blind_sum(
 		ctx: *const Context,
-		blind_out: *const c_uchar,
+		blind_out: *mut c_uchar,
 		blinds: *const *const c_uchar,
 		n: size_t,
 		npositive: size_t
@@ -439,7 +439,7 @@ extern "C" {
 	// the second and returns the resulting commitment.
 	pub fn secp256k1_pedersen_commit_sum(
 		ctx: *const Context,
-		commit_out: *const c_uchar,
+		commit_out: *mut c_uchar,
 		commits: *const *const c_uchar,
 		pcnt: size_t,
 		ncommits: *const *const c_uchar,
@@ -495,8 +495,8 @@ extern "C" {
 
 	pub fn secp256k1_rangeproof_verify(
 		ctx: *const Context,
-		min_value: &mut u64,
-		max_value: &mut u64,
+		min_value: *mut u64,
+		max_value: *mut u64,
 		commit: *const c_uchar,
 		proof: *const c_uchar,
 		plen: size_t,
