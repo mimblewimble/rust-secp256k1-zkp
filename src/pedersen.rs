@@ -19,7 +19,6 @@
 use libc::size_t;
 use std::cmp::min;
 use std::fmt;
-use std::mem;
 use std::ptr;
 use std::u64;
 
@@ -68,7 +67,7 @@ impl_pretty_debug!(CommitmentInternal);
 
 impl CommitmentInternal {
 	/// Uninitialized commitment, use with caution
-	pub unsafe fn blank() -> CommitmentInternal {
+	pub fn new() -> CommitmentInternal {
 		CommitmentInternal([0; constants::PEDERSEN_COMMITMENT_SIZE_INTERNAL])
 	}
 }
@@ -80,6 +79,12 @@ impl_array_newtype!(Commitment, u8, constants::PEDERSEN_COMMITMENT_SIZE);
 impl_pretty_debug!(Commitment);
 
 impl Commitment {
+
+	/// Create a zeroed commitment
+	fn zeroed() -> Commitment {
+		Commitment([0; constants::PEDERSEN_COMMITMENT_SIZE])
+	}
+
 	/// Builds a Hash from a byte vector. If the vector is too short, it will be
 	/// completed by zeroes. If it's too long, it will be truncated.
 	pub fn from_vec(v: Vec<u8>) -> Commitment {
@@ -88,11 +93,6 @@ impl Commitment {
 			h[i] = v[i];
 		}
 		Commitment(h)
-	}
-
-	/// Uninitialized commitment, use with caution
-	unsafe fn blank() -> Commitment {
-		Commitment([0; constants::PEDERSEN_COMMITMENT_SIZE])
 	}
 
 	/// Creates from a pubkey
@@ -109,7 +109,7 @@ impl Commitment {
 
 	/// Converts a commitment to a public key
 	pub fn to_pubkey(&self, secp: &Secp256k1) -> Result<key::PublicKey, Error> {
-		let mut pk = unsafe { ffi::PublicKey::blank() };
+		let mut pk = ffi::PublicKey::new();
 		unsafe {
 			let commit = secp.commit_parse(self.0.clone())?;
 			if ffi::secp256k1_pedersen_commitment_to_pubkey(secp.ctx, &mut pk, commit.as_ptr()) == 1 {
@@ -160,18 +160,16 @@ impl<'di> de::Visitor<'di> for Visitor {
 	where
 		V: de::SeqAccess<'di>,
 	{
-		unsafe {
-			let mut ret: [u8; constants::MAX_PROOF_SIZE] = mem::MaybeUninit::uninit().assume_init();
-			let mut i = 0;
-			while let Some(val) = v.next_element()? {
-				ret[i] = val;
-				i += 1;
-			}
-			Ok(RangeProof {
-				proof: ret,
-				plen: i,
-			})
+		let mut ret = [0u8; constants::MAX_PROOF_SIZE];
+		let mut i = 0;
+		while let Some(val) = v.next_element()? {
+			ret[i] = val;
+			i += 1;
 		}
+		Ok(RangeProof {
+			proof: ret,
+			plen: i,
+		})
 	}
 }
 
@@ -364,7 +362,7 @@ impl Secp256k1 {
 	fn commit_parse(&self, c_in: [u8;constants::PEDERSEN_COMMITMENT_SIZE])
 	-> Result<CommitmentInternal, Error> {
 		let c_out = unsafe {
-			let mut c_out = CommitmentInternal::blank();
+			let mut c_out = CommitmentInternal::new();
 			let ret = ffi::secp256k1_pedersen_commitment_parse(
 				self.ctx,
 				c_out.as_mut_ptr(),
@@ -383,7 +381,7 @@ impl Secp256k1 {
 	fn commit_ser(&self, c_in: [u8;constants::PEDERSEN_COMMITMENT_SIZE_INTERNAL])
 	-> Result<Commitment, Error> {
 		let c_out = unsafe {
-			let mut c_out = Commitment::blank();
+			let mut c_out = Commitment::zeroed();
 			ffi:: secp256k1_pedersen_commitment_serialize(
 				self.ctx,
 				c_out.as_mut_ptr(),
@@ -494,7 +492,7 @@ impl Secp256k1 {
 			.collect::<Result<Vec<_>, _>>()?;
 		let pos = map_vec!(pos, |p| p.0.as_ptr());
 		let neg = map_vec!(neg, |n| n.0.as_ptr());
-		let mut ret_i = unsafe { CommitmentInternal::blank() };
+		let mut ret_i = CommitmentInternal::new();
 		let err = unsafe {
 			ffi::secp256k1_pedersen_commit_sum(
 				self.ctx,
@@ -521,7 +519,7 @@ impl Secp256k1 {
 		let mut neg = map_vec!(negative, |n| n.as_ptr());
 		let mut all = map_vec!(positive, |p| p.as_ptr());
 		all.append(&mut neg);
-		let mut ret: [u8; 32] = unsafe { mem::MaybeUninit::uninit().assume_init() };
+		let mut ret = [0u8; 32];
 		unsafe {
 			assert_eq!(
 				ffi::secp256k1_pedersen_blind_sum(
@@ -543,7 +541,7 @@ impl Secp256k1 {
 		if self.caps != ContextFlag::Commit {
 			return Err(Error::IncapableContext);
 		}
-		let mut ret: [u8; 32] = unsafe { mem::MaybeUninit::uninit().assume_init() };
+		let mut ret = [0u8; 32];
 		unsafe {
 			assert_eq!(
 				ffi::secp256k1_blind_switch(
@@ -674,8 +672,8 @@ impl Secp256k1 {
 		nonce: SecretKey,
 	) -> ProofInfo {
 		let mut value: u64 = 0;
-		let mut blind: [u8; 32] = unsafe { mem::MaybeUninit::uninit().assume_init() };
-		let mut message: [u8; constants::PROOF_MSG_SIZE] = unsafe { mem::MaybeUninit::uninit().assume_init() };
+		let mut blind = [0u8; 32];
+		let mut message = [0u8; constants::PROOF_MSG_SIZE];
 		let mut mlen: usize = constants::PROOF_MSG_SIZE;
 		let mut min: u64 = 0;
 		let mut max: u64 = 0;

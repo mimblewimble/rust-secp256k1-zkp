@@ -208,7 +208,7 @@ impl PublicKey {
         if secp.caps == ContextFlag::VerifyOnly || secp.caps == ContextFlag::None {
             return Err(IncapableContext);
         }
-        let mut pk = unsafe { ffi::PublicKey::blank() };
+        let mut pk = ffi::PublicKey::new();
         unsafe {
             // We can assume the return value because it's not possible to construct
             // an invalid `SecretKey` without transmute trickery or something
@@ -222,7 +222,7 @@ impl PublicKey {
     #[inline]
     pub fn from_slice(secp: &Secp256k1, data: &[u8])
                       -> Result<PublicKey, Error> {
-        let mut pk = unsafe { ffi::PublicKey::blank() };
+        let mut pk = ffi::PublicKey::new();
         unsafe {
             if ffi::secp256k1_ec_pubkey_parse(secp.ctx, &mut pk, data.as_ptr(),
                                               data.len() as ::libc::size_t) == 1 {
@@ -314,34 +314,31 @@ impl<'de> Deserialize<'de> for PublicKey {
                 debug_assert!(constants::UNCOMPRESSED_PUBLIC_KEY_SIZE >= constants::COMPRESSED_PUBLIC_KEY_SIZE);
 
                 let s = Secp256k1::with_caps(crate::ContextFlag::None);
-                unsafe {
-                    use std::mem;
-                    let mut ret: [u8; constants::UNCOMPRESSED_PUBLIC_KEY_SIZE] = mem::MaybeUninit::uninit().assume_init();
+                let mut ret = [0u8; constants::UNCOMPRESSED_PUBLIC_KEY_SIZE];
 
-                    let mut read_len = 0;
-                    while read_len < constants::UNCOMPRESSED_PUBLIC_KEY_SIZE {
-                        let read_ch = match a.next_element()? {
-                            Some(c) => c,
-                            None => break
-                        };
-                        ret[read_len] = read_ch;
-                        read_len += 1;
-                    }
-                    let one_after_last : Option<u8> = a.next_element()?;
-                    if one_after_last.is_some() {
-                        return Err(de::Error::invalid_length(read_len + 1, &self));
-                    }
+                let mut read_len = 0;
+                while read_len < constants::UNCOMPRESSED_PUBLIC_KEY_SIZE {
+                    let read_ch = match a.next_element()? {
+                        Some(c) => c,
+                        None => break
+                    };
+                    ret[read_len] = read_ch;
+                    read_len += 1;
+                }
+                let one_after_last : Option<u8> = a.next_element()?;
+                if one_after_last.is_some() {
+                    return Err(de::Error::invalid_length(read_len + 1, &self));
+                }
 
-                    match read_len {
-                        constants::UNCOMPRESSED_PUBLIC_KEY_SIZE | constants::COMPRESSED_PUBLIC_KEY_SIZE
-                            => PublicKey::from_slice(&s, &ret[..read_len]).map_err(
-                                |e| match e {
-                                        InvalidPublicKey => de::Error::invalid_value(de::Unexpected::Seq, &self),
-                                        _ => de::Error::custom(&e.to_string()),
-                                    }
-                                ),
-                        _ => Err(de::Error::invalid_length(read_len, &self)),
-                    }
+                match read_len {
+                    constants::UNCOMPRESSED_PUBLIC_KEY_SIZE | constants::COMPRESSED_PUBLIC_KEY_SIZE
+                        => PublicKey::from_slice(&s, &ret[..read_len]).map_err(
+                            |e| match e {
+                                    InvalidPublicKey => de::Error::invalid_value(de::Unexpected::Seq, &self),
+                                    _ => de::Error::custom(&e.to_string()),
+                                }
+                            ),
+                    _ => Err(de::Error::invalid_length(read_len, &self)),
                 }
             }
 

@@ -16,8 +16,6 @@
 //! # FFI bindings
 //! Direct bindings to the underlying C library functions. These should
 //! not be needed for most users.
-use std::mem;
-
 use libc::{c_int, c_uchar, c_uint, c_void, size_t};
 
 /// Flag for context to enable no precomputation
@@ -83,8 +81,6 @@ impl_raw_debug!(PublicKey);
 impl PublicKey {
     /// Create a new (zeroed) public key usable for the FFI interface
     pub fn new() -> PublicKey { PublicKey([0; 64]) }
-    /// Create a new (uninitialized) public key usable for the FFI interface
-    pub unsafe fn blank() -> PublicKey { mem::MaybeUninit::uninit().assume_init() }
 }
 
 /// Library-internal representation of a Secp256k1 signature
@@ -113,22 +109,16 @@ impl Signature {
     pub fn new() -> Signature { Signature([0; 64]) }
     /// Create a signature from raw data
     pub fn from_data(data: [u8; 64]) -> Signature { Signature(data) }
-    /// Create a new (uninitialized) signature usable for the FFI interface
-    pub unsafe fn blank() -> Signature { mem::MaybeUninit::uninit().assume_init() }
 }
 
 impl RecoverableSignature {
     /// Create a new (zeroed) signature usable for the FFI interface
     pub fn new() -> RecoverableSignature { RecoverableSignature([0; 65]) }
-    /// Create a new (uninitialized) signature usable for the FFI interface
-    pub unsafe fn blank() -> RecoverableSignature { mem::MaybeUninit::uninit().assume_init() }
 }
 
 impl AggSigPartialSignature {
     /// Create a new (zeroed) aggsig partial signature usable for the FFI interface
     pub fn new() -> AggSigPartialSignature { AggSigPartialSignature([0; 32]) }
-    /// Create a new (uninitialized) signature usable for the FFI interface
-    pub unsafe fn blank() -> AggSigPartialSignature { mem::MaybeUninit::uninit().assume_init() }
 }
 
 /// Library-internal representation of an ECDH shared secret
@@ -138,10 +128,8 @@ impl_array_newtype!(SharedSecret, c_uchar, 32);
 impl_raw_debug!(SharedSecret);
 
 impl SharedSecret {
-    /// Create a new (zeroed) signature usable for the FFI interface
+    /// Create a new (zeroed) shared secret usable for the FFI interface
     pub fn new() -> SharedSecret { SharedSecret([0; 32]) }
-    /// Create a new (uninitialized) signature usable for the FFI interface
-    pub unsafe fn blank() -> SharedSecret { mem::MaybeUninit::uninit().assume_init() }
 }
 
 
