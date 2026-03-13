@@ -39,23 +39,23 @@ const SCRATCH_SPACE_SIZE: size_t = 256 * MAX_WIDTH;
 const MAX_GENERATORS: size_t = 256;
 
 /// Shared Bullet Proof Generators (avoid recreating every time)
-static mut SHARED_BULLETGENERATORS: Option<*mut ffi::BulletproofGenerators> = None;
+static SHARED_BULLETGENERATORS: std::sync::Once = std::sync::Once::new();
+static SHARED_BULLETGENERATORS_PTR: std::sync::atomic::AtomicPtr<ffi::BulletproofGenerators> =
+	std::sync::atomic::AtomicPtr::new(std::ptr::null_mut());
 
-// TODO: Check whether this matters if this is used with a different context; don't think it does
 fn shared_generators(ctx: *mut ffi::Context) -> *mut ffi::BulletproofGenerators {
-	unsafe {
-		match SHARED_BULLETGENERATORS.clone() {
-			Some(s) => s,
-			None => {
-				SHARED_BULLETGENERATORS = Some(ffi::secp256k1_bulletproof_generators_create(
-					ctx,
-					constants::GENERATOR_G.as_ptr(),
-					MAX_GENERATORS,
-				));
-				SHARED_BULLETGENERATORS.unwrap()
-			}
-		}
-	}
+	SHARED_BULLETGENERATORS.call_once(|| {
+		let ptr = unsafe {
+			ffi::secp256k1_bulletproof_generators_create(
+				ctx,
+				constants::GENERATOR_G.as_ptr(),
+				MAX_GENERATORS,
+			)
+		};
+		assert!(!ptr.is_null(), "secp256k1_bulletproof_generators_create returned null");
+		SHARED_BULLETGENERATORS_PTR.store(ptr, std::sync::atomic::Ordering::Release);
+	});
+	SHARED_BULLETGENERATORS_PTR.load(std::sync::atomic::Ordering::Acquire)
 }
 
 /// underling lib's representation of a commit, which is now a full 64 bytes
@@ -398,7 +398,7 @@ impl Secp256k1 {
 			return Err(Error::IncapableContext);
 		}
 		let mut commit_i = [0; constants::PEDERSEN_COMMITMENT_SIZE_INTERNAL];
-		unsafe {
+		let ret = unsafe {
 			ffi::secp256k1_pedersen_commit(
 				self.ctx,
 				commit_i.as_mut_ptr(),
@@ -408,6 +408,9 @@ impl Secp256k1 {
 				constants::GENERATOR_G.as_ptr(),
 			)
 		};
+		if ret != 1 {
+			return Err(Error::InvalidCommit);
+		}
 		Ok(self.commit_ser(commit_i)?)
 	}
 
@@ -417,7 +420,7 @@ impl Secp256k1 {
 			return Err(Error::IncapableContext);
 		}
 		let mut commit_i = [0; constants::PEDERSEN_COMMITMENT_SIZE_INTERNAL];
-		unsafe {
+		let ret = unsafe {
 			ffi::secp256k1_pedersen_blind_commit(
 				self.ctx,
 				commit_i.as_mut_ptr(),
@@ -427,6 +430,9 @@ impl Secp256k1 {
 				constants::GENERATOR_G.as_ptr(),
 			)
 		};
+		if ret != 1 {
+			return Err(Error::InvalidCommit);
+		}
 		Ok(self.commit_ser(commit_i)?)
 	}
 
@@ -439,7 +445,7 @@ impl Secp256k1 {
 		let mut commit_i = [0; constants::PEDERSEN_COMMITMENT_SIZE_INTERNAL];
 		let zblind = [0u8; 32];
 
-		unsafe {
+		let ret = unsafe {
 			ffi::secp256k1_pedersen_commit(
 				self.ctx,
 				commit_i.as_mut_ptr(),
@@ -449,6 +455,9 @@ impl Secp256k1 {
 				constants::GENERATOR_G.as_ptr(),
 			)
 		};
+		if ret != 1 {
+			return Err(Error::InvalidCommit);
+		}
 		Ok(self.commit_ser(commit_i)?)
 	}
 
