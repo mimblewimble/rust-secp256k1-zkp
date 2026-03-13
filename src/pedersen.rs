@@ -163,6 +163,9 @@ impl<'di> de::Visitor<'di> for Visitor {
 		let mut ret = [0u8; constants::MAX_PROOF_SIZE];
 		let mut i = 0;
 		while let Some(val) = v.next_element()? {
+			if i >= constants::MAX_PROOF_SIZE {
+				return Err(de::Error::invalid_length(i, &self));
+			}
 			ret[i] = val;
 			i += 1;
 		}
@@ -822,7 +825,6 @@ impl Secp256k1 {
 				message_ptr,
 			);
 
-			//			ffi::secp256k1_bulletproof_generators_destroy(self.ctx, *gens);
 			ffi::secp256k1_scratch_space_destroy(scratch);
 
 			result == 1
@@ -996,7 +998,6 @@ impl Secp256k1 {
 				extra_data,
 				extra_data_len as size_t,
 			);
-			//			ffi::secp256k1_bulletproof_generators_destroy(self.ctx, gens);
 			ffi::secp256k1_scratch_space_destroy(scratch);
 			result == 1
 		};
@@ -1080,7 +1081,6 @@ impl Secp256k1 {
 				extra_data_vec.as_ptr(),
 				extra_data_lengths.as_ptr(),
 			);
-			//			ffi::secp256k1_bulletproof_generators_destroy(self.ctx, gens);
 			ffi::secp256k1_scratch_space_destroy(scratch);
 			result == 1
 		};
@@ -1129,7 +1129,6 @@ impl Secp256k1 {
 				extra_data_len as size_t,
 				message_out.as_mut_ptr(),
 			);
-			//			ffi::secp256k1_bulletproof_generators_destroy(self.ctx, gens);
 			ffi::secp256k1_scratch_space_destroy(scratch);
 			result == 1
 		};
@@ -1909,21 +1908,21 @@ mod tests {
 			}
 			println!("--------");
 			println!("Comparing {} Proofs", v);
-			let start = Utc::now().timestamp_nanos();
+			let start = Utc::now().timestamp_nanos_opt().unwrap();
 			for i in 0..v {
 				let proof_range = secp
 					.verify_bullet_proof(commits[i].clone(), proofs[i].clone(), None)
 					.unwrap();
 				assert_eq!(proof_range.min, 0);
 			}
-			let fin = Utc::now().timestamp_nanos();
+			let fin = Utc::now().timestamp_nanos_opt().unwrap();
 			let dur_ms = (fin - start) as f64 * nano_to_millis;
 			println!("{} proofs single validated in {}ms", v, dur_ms);
 
-			let start = Utc::now().timestamp_nanos();
+			let start = Utc::now().timestamp_nanos_opt().unwrap();
 			let proof_range = secp.verify_bullet_proof_multi(commits.clone(), proofs.clone(), None);
 			assert!(!proof_range.is_err());
-			let fin = Utc::now().timestamp_nanos();
+			let fin = Utc::now().timestamp_nanos_opt().unwrap();
 			let dur_ms = (fin - start) as f64 * nano_to_millis;
 			println!("{} proofs batch validated in {}ms", v, dur_ms);
 		}
@@ -2036,5 +2035,49 @@ mod tests {
 			}
 		}
 		assert_eq!(errs, 0);
+	}
+
+	#[test]
+	fn commit_parse_rejects_invalid_input() {
+		let secp = Secp256k1::with_caps(ContextFlag::Commit);
+		let garbage = [0u8; 33];
+		assert!(secp.commit_parse(garbage).is_err());
+
+		let mut bad = [0xFFu8; 33];
+		bad[0] = 0x0F;
+		assert!(secp.commit_parse(bad).is_err());
+	}
+
+	#[test]
+	fn commit_parse_does_not_return_stale_data() {
+		let secp = Secp256k1::with_caps(ContextFlag::Commit);
+		let valid = secp.commit(1, ZERO_KEY).unwrap();
+		let valid_internal = secp.commit_parse(valid.0).unwrap();
+
+		// invalid parse must not return the previous valid result
+		let garbage = [0u8; 33];
+		let result = secp.commit_parse(garbage);
+		assert!(result.is_err());
+		if let Ok(bad) = result {
+			assert_ne!(bad.0, valid_internal.0);
+		}
+	}
+
+	#[test]
+	fn commit_sum_rejects_invalid_commitment() {
+		let secp = Secp256k1::with_caps(ContextFlag::Commit);
+		let valid = secp.commit(1, ZERO_KEY).unwrap();
+		let garbage = Commitment([0x0F; 33]);
+		let result = secp.commit_sum(vec![valid], vec![garbage]);
+		assert!(result.is_err());
+	}
+
+	#[test]
+	fn rangeproof_deser_rejects_overlong_proof() {
+		use serde_json;
+		let too_long: Vec<u8> = vec![0u8; constants::MAX_PROOF_SIZE + 1];
+		let json = serde_json::to_string(&too_long).unwrap();
+		let result: Result<RangeProof, _> = serde_json::from_str(&json);
+		assert!(result.is_err());
 	}
 }

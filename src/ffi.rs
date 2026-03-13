@@ -133,6 +133,9 @@ impl SharedSecret {
 }
 
 
+// Raw C bindings
+// Safe rust wrappers in lib.rs for docs
+#[allow(missing_docs)]
 extern "C" {
     pub static secp256k1_nonce_function_rfc6979: NonceFn;
 
@@ -379,21 +382,21 @@ extern "C" {
                           scalar: *const c_uchar)
                           -> c_int;
 
-  // Parse a 33-byte commitment into 64 byte internal commitment object
+  /// Parse a 33-byte commitment into 64 byte internal commitment object
   pub fn secp256k1_pedersen_commitment_parse(cx: *const Context,
                                               commit: *mut c_uchar,
                                               input: *const c_uchar)
                                               -> c_int;
 
-  // Serialize a 64-byte commit object into a 33 byte serialized byte sequence
+  /// Serialize a 64-byte commit object into a 33 byte serialized byte sequence
   pub fn secp256k1_pedersen_commitment_serialize(cx: *const Context,
                                                   output: *mut c_uchar,
                                                   commit: *const c_uchar)
                                                   -> c_int;
 
 
-	// Generates a pedersen commitment: *commit = blind * G + value * G2.
-	// The commitment is 33 bytes, the blinding factor is 32 bytes.
+	/// Generates a pedersen commitment: *commit = blind * G + value * G2.
+	/// The commitment is 33 bytes, the blinding factor is 32 bytes.
 	pub fn secp256k1_pedersen_commit(
 		ctx: *const Context,
 		commit: *mut c_uchar,
@@ -403,8 +406,8 @@ extern "C" {
 		blind_gen: *const c_uchar
 	) -> c_int;
 
-	// Generates a pedersen commitment: *commit = blind * G + value * G2.
-	// The commitment is 33 bytes, the blinding factor and the value are 32 bytes.
+	/// Generates a pedersen commitment: *commit = blind * G + value * G2.
+	/// The commitment is 33 bytes, the blinding factor and the value are 32 bytes.
 	pub fn secp256k1_pedersen_blind_commit(
 		ctx: *const Context,
 		commit: *mut c_uchar,
@@ -414,19 +417,19 @@ extern "C" {
 		blind_gen: *const c_uchar
 	) -> c_int;
 
-	// Get the public key of a pedersen commitment
+	/// Get the public key of a pedersen commitment
 	pub fn secp256k1_pedersen_commitment_to_pubkey(
 	    cx: *const Context, pk: *mut PublicKey,
 	    commit: *const c_uchar) -> c_int;
 
-	// Get a pedersen commitment from a pubkey
+	/// Get a pedersen commitment from a pubkey
 	pub fn secp256k1_pubkey_to_pedersen_commitment(
 	    cx: *const Context, commit: *mut c_uchar,
 	    pk: *const PublicKey) -> c_int;
 
-	// Takes a list of n pointers to 32 byte blinding values, the first negs
-	// of which are treated with positive sign and the rest negative, then
-	// calculates an additional blinding value that adds to zero.
+	/// Takes a list of n pointers to 32 byte blinding values, the first negs
+	/// of which are treated with positive sign and the rest negative, then
+	/// calculates an additional blinding value that adds to zero.
 	pub fn secp256k1_pedersen_blind_sum(
 		ctx: *const Context,
 		blind_out: *mut c_uchar,
@@ -435,8 +438,8 @@ extern "C" {
 		npositive: size_t
 	) -> c_int;
 
-	// Takes two list of 64-byte commitments and sums the first set, subtracts
-	// the second and returns the resulting commitment.
+	/// Takes two list of 64-byte commitments and sums the first set, subtracts
+	/// the second and returns the resulting commitment.
 	pub fn secp256k1_pedersen_commit_sum(
 		ctx: *const Context,
 		commit_out: *mut c_uchar,
@@ -446,7 +449,7 @@ extern "C" {
 		ncnt: size_t
 	) -> c_int;
 
-    // Calculate blinding factor for switch commitment x + H(xG+vH | xJ)
+    /// Calculate blinding factor for switch commitment x + H(xG+vH | xJ)
     pub fn secp256k1_blind_switch(
         ctx: *const Context,
         blind_switch: *mut c_uchar,
@@ -457,8 +460,8 @@ extern "C" {
         switch_pubkey: *const c_uchar
     ) -> c_int;
 
-	// Takes two list of 64-byte commitments and sums the first set and
-	// subtracts the second and verifies that they sum to 0.
+	/// Takes two list of 64-byte commitments and sums the first set and
+	/// subtracts the second and verifies that they sum to 0.
 	pub fn secp256k1_pedersen_verify_tally(ctx: *const Context,
 		commits: *const *const c_uchar,
 		pcnt: size_t,

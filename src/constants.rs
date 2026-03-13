@@ -80,7 +80,7 @@ pub const CURVE_ORDER: [u8; 32] = [
 ///
 /// Used as generator point for the blinding factor in Pedersen Commitments.
 /// Definition: Standard generator point of secp256k1
-/// (as defined in http://www.secg.org/sec2-v2.pdf)
+/// (as defined in <http://www.secg.org/sec2-v2.pdf>)
 ///
 /// Format: x- and y- coordinate, without compressed/uncompressed prefix byte
 pub const GENERATOR_G : [u8;64] = [
@@ -175,7 +175,7 @@ pub const GENERATOR_H : [u8;64] = [
 /// This is different from G and H as in the underlying secp256k1 library, J is
 /// declared as "secp256k1_pubkey" while G and H are declared as "secp256k1_generator"
 /// which seem to be represented and parsed differently (see "secp256k1_ec_pubkey_parse" vs
-/// "secp256k1_generator_parse" in https://github.com/mimblewimble/secp256k1-zkp/).
+/// "secp256k1_generator_parse" in <https://github.com/mimblewimble/secp256k1-zkp/>).
 pub const GENERATOR_PUB_J_RAW : [u8;64] = [
     0x5f, 0x15, 0x21, 0x36, 0x93, 0x93, 0x01, 0x2a,
     0x8d, 0x8b, 0x39, 0x7e, 0x9b, 0xf4, 0x54, 0x29,

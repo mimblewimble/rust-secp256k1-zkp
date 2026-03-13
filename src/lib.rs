@@ -543,10 +543,9 @@ impl fmt::Display for ContextFlag {
 
 impl Clone for Secp256k1 {
     fn clone(&self) -> Secp256k1 {
-        Secp256k1 {
-            ctx: unsafe { ffi::secp256k1_context_clone(self.ctx) },
-            caps: self.caps
-        }
+        let ctx = unsafe { ffi::secp256k1_context_clone(self.ctx) };
+        assert!(!ctx.is_null(), "secp256k1_context_clone returned null");
+        Secp256k1 { ctx, caps: self.caps }
     }
 }
 
@@ -584,7 +583,9 @@ impl Secp256k1 {
                 ffi::SECP256K1_START_SIGN | ffi::SECP256K1_START_VERIFY
             }
         };
-        Secp256k1 { ctx: unsafe { ffi::secp256k1_context_create(flag) }, caps: caps }
+        let ctx = unsafe { ffi::secp256k1_context_create(flag) };
+        assert!(!ctx.is_null(), "secp256k1_context_create returned null");
+        Secp256k1 { ctx, caps }
     }
 
     /// Creates a new Secp256k1 context with no capabilities (just de/serialization)
