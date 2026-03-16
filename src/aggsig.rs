@@ -37,17 +37,18 @@ pub fn export_secnonce_single(secp: &Secp256k1) -> Result<SecretKey, Error> {
 	let mut return_key = SecretKey::new(&secp, &mut thread_rng());
 	let mut seed = [0u8; 32];
 	thread_rng().fill(&mut seed);
-	let retval = unsafe {
+	let ret = unsafe {
 		ffi::secp256k1_aggsig_export_secnonce_single(
 			secp.ctx,
 			return_key.as_mut_ptr(),
 			seed.as_ptr(),
 		)
 	};
-	if retval == 0 {
-		return Err(Error::InvalidSignature);
+	if ret == 1 {
+		Ok(return_key)
+	} else {
+		Err(Error::CannotExportAggsigNonce)
 	}
-	Ok(return_key)
 }
 
 // This is a macro that check zero public key
@@ -115,7 +116,7 @@ pub fn sign_single(
 
 	let pe = is_zero_pubkey!(reterr => pubkey_for_e);
 
-	let retval = unsafe {
+	let ret = unsafe {
 		ffi::secp256k1_aggsig_sign_single(
 			secp.ctx,
 			retsig.as_mut_ptr(),
@@ -129,10 +130,11 @@ pub fn sign_single(
 			seed.as_ptr(),
 		)
 	};
-	if retval == 0 {
-		return Err(Error::InvalidSignature);
+	if ret == 1 {
+		Ok(retsig)
+	} else {
+		Err(Error::CannotSignAggsig)
 	}
-	Ok(retsig)
 }
 
 /// Single-Signer (plain old Schnorr, sans-multisig) signature verification
@@ -169,7 +171,7 @@ pub fn verify_single(
 		return false;
 	}
 
-	let retval = unsafe {
+	let ret = unsafe {
 		ffi::secp256k1_aggsig_verify_single(
 			secp.ctx,
 			sig.as_ptr(),
@@ -181,11 +183,7 @@ pub fn verify_single(
 			is_partial,
 		)
 	};
-	match retval {
-		0 => false,
-		1 => true,
-		_ => false,
-	}
+	ret == 1
 }
 
 
@@ -211,23 +209,26 @@ pub fn verify_batch(
 		}
 	}
 
-	let sigs_vec = map_vec!(sigs, |s| s.0.as_ptr());
-	let msgs_vec = map_vec!(msgs, |m| m.as_ptr());
-	let pub_keys_vec = map_vec!(pub_keys, |pk| pk.as_ptr());
+	let sigs_vec: Vec<_> = sigs.iter().map(|s| s.0.as_ptr()).collect();
+	let msgs_vec: Vec<_> = msgs.iter().map(|m| m.as_ptr()).collect();
+	let pub_keys_vec: Vec<_> = pub_keys.iter().map(|pk| pk.as_ptr()).collect();
 
-	unsafe {
-		let scratch = ffi::secp256k1_scratch_space_create(secp.ctx, SCRATCH_SPACE_SIZE);
-		let result = ffi::secp256k1_schnorrsig_verify_batch(
+	let scratch = unsafe { ffi::secp256k1_scratch_space_create(secp.ctx, SCRATCH_SPACE_SIZE) };
+	if scratch.is_null() {
+		return false;
+	}
+	let ret = unsafe {
+		ffi::secp256k1_schnorrsig_verify_batch(
 			secp.ctx,
 			scratch,
 			sigs_vec.as_ptr(),
 			msgs_vec.as_ptr(),
 			pub_keys_vec.as_ptr(),
 			sigs.len(),
-		);
-		ffi::secp256k1_scratch_space_destroy(scratch);
-		result == 1
-	}
+		)
+	};
+	unsafe { ffi::secp256k1_scratch_space_destroy(scratch) };
+	ret == 1
 }
 
 /// Single-Signer addition of Signatures
@@ -242,8 +243,8 @@ pub fn add_signatures_single(
 	pubnonce_total: &PublicKey,
 ) -> Result<Signature, Error> {
 	let mut retsig = Signature::from(ffi::Signature::new());
-	let sig_vec = map_vec!(sigs, |s| s.0.as_ptr());
-	let retval = unsafe {
+	let sig_vec: Vec<_> = sigs.iter().map(|s| s.0.as_ptr()).collect();
+	let ret = unsafe {
 		ffi::secp256k1_aggsig_add_signatures_single(
 			secp.ctx,
 			retsig.as_mut_ptr(),
@@ -252,10 +253,11 @@ pub fn add_signatures_single(
 			pubnonce_total.as_ptr(),
 		)
 	};
-	if retval == 0 {
-		return Err(Error::InvalidSignature);
+	if ret == 1 {
+		Ok(retsig)
+	} else {
+		Err(Error::CannotCombineAggsigSignatures)
 	}
-	Ok(retsig)
 }
 
 /// Subtraction of partial signature from a signature
@@ -271,7 +273,7 @@ pub fn subtract_partial_signature(
 ) -> Result<(Signature, Option<Signature>), Error> {
 	let mut ret_partsig = Signature::from(ffi::Signature::new());
 	let mut ret_partsig_alt = Signature::from(ffi::Signature::new());
-	let retval = unsafe {
+	let ret = unsafe {
 		ffi::secp256k1_aggsig_subtract_partial_signature(
 			secp.ctx,
 			ret_partsig.as_mut_ptr(),
@@ -280,12 +282,11 @@ pub fn subtract_partial_signature(
 			partial_sig.as_ptr(),
 		)
 	};
-
-	match retval {
-		-1 => Err(Error::SigSubtractionFailure),
+	match ret {
+		-1 => Err(Error::AggsigNoQuadraticResidue),
 		1 => Ok((ret_partsig, None)),
 		2 => Ok((ret_partsig, Some(ret_partsig_alt))),
-		_ => Err(Error::InvalidSignature)
+		_ => Err(Error::InvalidAggsigSignature)
 	}
 }
 
@@ -323,13 +324,9 @@ impl AggSigContext {
 	///          false if a nonce has already been generated for this index
 	/// In: index: which signature to generate a nonce for
 	pub fn generate_nonce(&self, index: usize) -> bool {
-		let retval =
+		let ret =
 			unsafe { ffi::secp256k1_aggsig_generate_nonce(self.ctx, self.aggsig_ctx, index) };
-		match retval {
-			0 => false,
-			1 => true,
-			_ => false,
-		}
+		ret == 1
 	}
 
 	/// Generate a single signature part in an aggregated signature
@@ -345,7 +342,7 @@ impl AggSigContext {
 		index: usize,
 	) -> Result<AggSigPartialSignature, Error> {
 		let mut retsig = AggSigPartialSignature::from(ffi::AggSigPartialSignature::new());
-		let retval = unsafe {
+		let ret = unsafe {
 			ffi::secp256k1_aggsig_partial_sign(
 				self.ctx,
 				self.aggsig_ctx,
@@ -355,10 +352,11 @@ impl AggSigContext {
 				index,
 			)
 		};
-		if retval == 0 {
-			return Err(Error::PartialSigFailure);
+		if ret == 1 {
+			Ok(retsig)
+		} else {
+			Err(Error::PartialSigFailure)
 		}
-		Ok(retsig)
 	}
 
 	/// Aggregate multiple signature parts into a single aggregated signature
@@ -373,7 +371,7 @@ impl AggSigContext {
 		let partial_sigs: Vec<*const ffi::AggSigPartialSignature> =
 			partial_sigs.into_iter().map(|p| p.as_ptr()).collect();
 		let partial_sigs = &partial_sigs[..];
-		let retval = unsafe {
+		let ret = unsafe {
 			ffi::secp256k1_aggsig_combine_signatures(
 				self.ctx,
 				self.aggsig_ctx,
@@ -382,10 +380,11 @@ impl AggSigContext {
 				partial_sigs.len(),
 			)
 		};
-		if retval == 0 {
-			return Err(Error::PartialSigFailure);
+		if ret == 1 {
+			Ok(retsig)
+		} else {
+			Err(Error::PartialSigFailure)
 		}
-		Ok(retsig)
 	}
 
 	/// Verifies aggregate sig
@@ -397,7 +396,7 @@ impl AggSigContext {
 	pub fn verify(&self, sig: Signature, msg: Message, pks: &Vec<PublicKey>) -> bool {
 		let pks: Vec<*const ffi::PublicKey> = pks.into_iter().map(|p| p.as_ptr()).collect();
 		let pks = &pks[..];
-		let retval = unsafe {
+		let ret = unsafe {
 			ffi::secp256k1_aggsig_build_scratch_and_verify(
 				self.ctx,
 				sig.as_ptr(),
@@ -406,11 +405,7 @@ impl AggSigContext {
 				pks.len(),
 			)
 		};
-		match retval {
-			0 => false,
-			1 => true,
-			_ => false,
-		}
+		ret == 1
 	}
 }
 
@@ -452,9 +447,9 @@ use crate::ffi;
 		let aggsig = AggSigContext::new(&secp, &pks);
 		println!("Generating nonces for each index");
 		for i in 0..numkeys {
-			let retval = aggsig.generate_nonce(i);
-			println!("{} returned {}", i, retval);
-			assert!(retval == true);
+			let ret = aggsig.generate_nonce(i);
+			println!("{} returned {}", i, ret);
+			assert!(ret == true);
 		}
 
 		let mut msg = [0u8; 32];
