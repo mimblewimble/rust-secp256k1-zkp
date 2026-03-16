@@ -50,22 +50,21 @@ pub const PEDERSEN_COMMITMENT_SIZE: usize = 33;
 /// The size of a Pedersen commitment
 pub const PEDERSEN_COMMITMENT_SIZE_INTERNAL: usize = 64;
 
-/// The size of a single Bullet proof
+/// Size of a single bulletproof: 193 header + 482 inner product = 675.
 pub const SINGLE_BULLET_PROOF_SIZE: usize = 675;
 
+/// Max range proof size. Grin use `bullet-proof-sizing` so this is 675.
 #[cfg(feature = "bullet-proof-sizing")]
 pub const MAX_PROOF_SIZE: usize = SINGLE_BULLET_PROOF_SIZE;
-/// The max size of a range proof
+/// Max range proof size (Borromean).
 #[cfg(not(feature = "bullet-proof-sizing"))]
 pub const MAX_PROOF_SIZE: usize = 5134;
 
-/// The maximum size of a message embedded in a range proof
-#[cfg(not(feature = "bullet-proof-sizing"))]
-pub const PROOF_MSG_SIZE: usize = 2048;
-#[cfg(feature = "bullet-proof-sizing")]
+/// Max message size for Borromean range proofs.
+#[cfg(feature = "borromean")]
 pub const PROOF_MSG_SIZE: usize = 2048;
 
-/// The maximum size of an optional message embedded in a bullet proof
+/// Max message size for bulletproof range proofs
 pub const BULLET_PROOF_MSG_SIZE: usize = 20;
 
 /// The order of the secp256k1 curve

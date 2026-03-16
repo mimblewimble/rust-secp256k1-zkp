@@ -479,20 +479,18 @@ pub enum Error {
     InvalidBulletproof,
     /// Failed to rewind a bulletproof range proof
     CannotRewindBulletproof,
-    /// Failed to create an aggsig signature
-    CannotSignAggsig,
-    /// Failed to export aggsig nonce
-    CannotExportAggsigNonce,
-    /// Failed to combine aggsig signatures
-    CannotCombineAggsigSignatures,
-    /// Subtracted aggsig partial signature has no nonce with quadratic residue y
-    AggsigNoQuadraticResidue,
-    /// Given bytes don't represent a valid aggsig signature
-    InvalidAggsigSignature,
-    /// Error creating partial signature
-    PartialSigFailure,
-    /// Failure subtracting two signatures
-    SigSubtractionFailure,
+    /// Failed to create a signature
+    CannotCreateSignature,
+    /// Failed to export a secret nonce
+    CannotExportNonce,
+    /// Failed to combine signatures
+    CannotCombineSignatures,
+    /// Subtracted partial signature has no nonce with quadratic residue y
+    SignatureNoQuadraticResidue,
+    /// Failed to subtract a partial signature
+    CannotSubtractSignature,
+    /// Failed to create a partial signature
+    CannotCreatePartialSignature,
 }
 
 impl Error {
@@ -512,13 +510,12 @@ impl Error {
             Error::CannotMakeBulletproof => "secp: failed to create bulletproof",
             Error::InvalidBulletproof => "secp: invalid bulletproof",
             Error::CannotRewindBulletproof => "secp: failed to rewind bulletproof",
-            Error::CannotSignAggsig => "secp: failed to create aggsig signature",
-            Error::CannotExportAggsigNonce => "secp: failed to export aggsig nonce",
-            Error::CannotCombineAggsigSignatures => "secp: failed to combine aggsig signatures",
-            Error::AggsigNoQuadraticResidue => "secp: aggsig subtraction has no quadratic residue",
-            Error::InvalidAggsigSignature => "secp: invalid aggsig signature",
-            Error::PartialSigFailure => "secp: partial sig (aggsig) failure",
-            Error::SigSubtractionFailure => "secp: subtraction (aggsig) did not result in any valid signatures",
+            Error::CannotCreateSignature => "secp: failed to create signature",
+            Error::CannotExportNonce => "secp: failed to export secret nonce",
+            Error::CannotCombineSignatures => "secp: failed to combine signatures",
+            Error::SignatureNoQuadraticResidue => "secp: signature subtraction has no quadratic residue",
+            Error::CannotSubtractSignature => "secp: failed to subtract partial signature",
+            Error::CannotCreatePartialSignature => "secp: failed to create partial signature",
         }
     }
 }
