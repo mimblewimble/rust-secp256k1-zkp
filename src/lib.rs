@@ -471,6 +471,24 @@ pub enum Error {
     IncorrectCommitSum,
     /// Range proof is invalid
     InvalidRangeProof,
+    /// Failed to create a range proof
+    CannotMakeRangeProof,
+    /// Failed to create a bulletproof range proof
+    CannotMakeBulletproof,
+    /// Given bulletproof range proof is invalid
+    InvalidBulletproof,
+    /// Failed to rewind a bulletproof range proof
+    CannotRewindBulletproof,
+    /// Failed to create an aggsig signature
+    CannotSignAggsig,
+    /// Failed to export aggsig nonce
+    CannotExportAggsigNonce,
+    /// Failed to combine aggsig signatures
+    CannotCombineAggsigSignatures,
+    /// Subtracted aggsig partial signature has no nonce with quadratic residue y
+    AggsigNoQuadraticResidue,
+    /// Given bytes don't represent a valid aggsig signature
+    InvalidAggsigSignature,
     /// Error creating partial signature
     PartialSigFailure,
     /// Failure subtracting two signatures
@@ -490,6 +508,15 @@ impl Error {
             Error::InvalidRecoveryId => "secp: bad recovery id",
             Error::IncorrectCommitSum => "secp: invalid pedersen commitment sum",
             Error::InvalidRangeProof => "secp: invalid range proof",
+            Error::CannotMakeRangeProof => "secp: failed to create range proof",
+            Error::CannotMakeBulletproof => "secp: failed to create bulletproof",
+            Error::InvalidBulletproof => "secp: invalid bulletproof",
+            Error::CannotRewindBulletproof => "secp: failed to rewind bulletproof",
+            Error::CannotSignAggsig => "secp: failed to create aggsig signature",
+            Error::CannotExportAggsigNonce => "secp: failed to export aggsig nonce",
+            Error::CannotCombineAggsigSignatures => "secp: failed to combine aggsig signatures",
+            Error::AggsigNoQuadraticResidue => "secp: aggsig subtraction has no quadratic residue",
+            Error::InvalidAggsigSignature => "secp: invalid aggsig signature",
             Error::PartialSigFailure => "secp: partial sig (aggsig) failure",
             Error::SigSubtractionFailure => "secp: subtraction (aggsig) did not result in any valid signatures",
         }
