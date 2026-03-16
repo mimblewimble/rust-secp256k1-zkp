@@ -595,8 +595,7 @@ impl Secp256k1 {
 		blind: SecretKey,
 		commit: Commitment,
 		message: ProofMessage,
-	) -> RangeProof {
-		let mut retried = false;
+	) -> Result<RangeProof, Error> {
 		let mut proof = [0; constants::MAX_PROOF_SIZE];
 		let mut plen = constants::MAX_PROOF_SIZE as size_t;
 
@@ -608,44 +607,62 @@ impl Secp256k1 {
 
 		let extra_commit = [0u8; 33];
 
-		let commit = self.commit_parse(commit.0).unwrap();
+		let commit = self.commit_parse(commit.0)?;
 
-		// TODO - confirm this reworked retry logic works as expected
-		// pretty sure the original approach retried on success (so twice in total)
-		// and just kept looping forever on error
-		loop {
-			let ret = unsafe {
-				// because: "This can randomly fail with probability around one in 2^100.
-				// If this happens, buy a lottery ticket and retry."
-				ffi::secp256k1_rangeproof_sign(
-					self.ctx,
-					proof.as_mut_ptr(),
-					&mut plen,
-					min,
-					commit.as_ptr(),
-					blind.as_ptr(),
-					nonce.as_ptr(),
-					0,
-					64,
-					value,
-					message.as_ptr(),
-					message.len(),
-					extra_commit.as_ptr(),
-					0 as size_t,
-					constants::GENERATOR_H.as_ptr(),
-				)
-			};
-			// break out of the loop immediately on success or
-			// or on the 2nd attempt if we retried
-			if ret == 1 || retried {
-				break;
-			} else {
-				retried = true;
-			}
+		// "This can randomly fail with probability around one in 2^100.
+		// If this happens, buy a lottery ticket and retry."
+		let ret = unsafe {
+			ffi::secp256k1_rangeproof_sign(
+				self.ctx,
+				proof.as_mut_ptr(),
+				&mut plen,
+				min,
+				commit.as_ptr(),
+				blind.as_ptr(),
+				nonce.as_ptr(),
+				0,
+				64,
+				value,
+				message.as_ptr(),
+				message.len(),
+				extra_commit.as_ptr(),
+				0 as size_t,
+				constants::GENERATOR_H.as_ptr(),
+			)
+		};
+		if ret == 1 {
+			return Ok(RangeProof {
+				proof: proof,
+				plen: plen as usize,
+			});
 		}
-		RangeProof {
-			proof: proof,
-			plen: plen as usize,
+		// retry once
+		let ret = unsafe {
+			ffi::secp256k1_rangeproof_sign(
+				self.ctx,
+				proof.as_mut_ptr(),
+				&mut plen,
+				min,
+				commit.as_ptr(),
+				blind.as_ptr(),
+				nonce.as_ptr(),
+				0,
+				64,
+				value,
+				message.as_ptr(),
+				message.len(),
+				extra_commit.as_ptr(),
+				0 as size_t,
+				constants::GENERATOR_H.as_ptr(),
+			)
+		};
+		if ret == 1 {
+			Ok(RangeProof {
+				proof: proof,
+				plen: plen as usize,
+			})
+		} else {
+			Err(Error::CannotMakeRangeProof)
 		}
 	}
 
@@ -689,7 +706,7 @@ impl Secp256k1 {
 		commit: Commitment,
 		proof: RangeProof,
 		nonce: SecretKey,
-	) -> ProofInfo {
+	) -> Result<ProofInfo, Error> {
 		let mut value: u64 = 0;
 		let mut blind = [0u8; 32];
 		let mut message = [0u8; constants::PROOF_MSG_SIZE];
@@ -699,7 +716,7 @@ impl Secp256k1 {
 
 		let extra_commit = [0u8; 33];
 
-		let commit = self.commit_parse(commit.0).unwrap();
+		let commit = self.commit_parse(commit.0)?;
 
 		let ret = unsafe {
 			ffi::secp256k1_rangeproof_rewind(
@@ -720,7 +737,7 @@ impl Secp256k1 {
 			)
 		};
 
-		ProofInfo {
+		Ok(ProofInfo {
 			success: ret == 1,
 			value: value,
 			message: ProofMessage::from_bytes(&message),
@@ -730,7 +747,7 @@ impl Secp256k1 {
 			max: max,
 			exp: 0,
 			mantissa: 0,
-		}
+		})
 	}
 
 	/// General information extracted from a range proof. Does not provide any
@@ -1429,7 +1446,7 @@ mod tests {
 		let blinding = SecretKey::new(&secp, &mut thread_rng());
 		let commit = secp.commit(7, blinding.clone()).unwrap();
 		let msg = ProofMessage::empty();
-		let range_proof = secp.range_proof(0, 7, blinding.clone(), commit, msg.clone());
+		let range_proof = secp.range_proof(0, 7, blinding.clone(), commit, msg.clone()).unwrap();
 		let proof_range = secp.verify_range_proof(commit, range_proof).unwrap();
 
 		assert_eq!(proof_range.min, 0);
@@ -1440,22 +1457,22 @@ mod tests {
 		// check we get no information back for the value here
 		assert_eq!(proof_info.value, 0);
 
-		let proof_info = secp.rewind_range_proof(commit, range_proof, blinding.clone());
+		let proof_info = secp.rewind_range_proof(commit, range_proof, blinding.clone()).unwrap();
 		assert!(proof_info.success);
 		assert_eq!(proof_info.min, 0);
 		assert_eq!(proof_info.value, 7);
 
 		// check we cannot rewind a range proof without the original nonce
 		let bad_nonce = SecretKey::new(&secp, &mut thread_rng());
-		let bad_info = secp.rewind_range_proof(commit, range_proof, bad_nonce);
+		let bad_info = secp.rewind_range_proof(commit, range_proof, bad_nonce).unwrap();
 		assert_eq!(bad_info.success, false);
 		assert_eq!(bad_info.value, 0);
 
 		// check we can construct and verify a range proof on value 0
 		let commit = secp.commit(0, blinding.clone()).unwrap();
-		let range_proof = secp.range_proof(0, 0, blinding.clone(), commit, msg);
+		let range_proof = secp.range_proof(0, 0, blinding.clone(), commit, msg).unwrap();
 		secp.verify_range_proof(commit, range_proof).unwrap();
-		let proof_info = secp.rewind_range_proof(commit, range_proof, blinding);
+		let proof_info = secp.rewind_range_proof(commit, range_proof, blinding).unwrap();
 		assert!(proof_info.success);
 		assert_eq!(proof_info.min, 0);
 		assert_eq!(proof_info.value, 0);
