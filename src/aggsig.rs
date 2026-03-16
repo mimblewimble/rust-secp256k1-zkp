@@ -47,7 +47,7 @@ pub fn export_secnonce_single(secp: &Secp256k1) -> Result<SecretKey, Error> {
 	if ret == 1 {
 		Ok(return_key)
 	} else {
-		Err(Error::CannotExportAggsigNonce)
+		Err(Error::CannotExportNonce)
 	}
 }
 
@@ -133,7 +133,7 @@ pub fn sign_single(
 	if ret == 1 {
 		Ok(retsig)
 	} else {
-		Err(Error::CannotSignAggsig)
+		Err(Error::CannotCreateSignature)
 	}
 }
 
@@ -256,7 +256,7 @@ pub fn add_signatures_single(
 	if ret == 1 {
 		Ok(retsig)
 	} else {
-		Err(Error::CannotCombineAggsigSignatures)
+		Err(Error::CannotCombineSignatures)
 	}
 }
 
@@ -283,10 +283,10 @@ pub fn subtract_partial_signature(
 		)
 	};
 	match ret {
-		-1 => Err(Error::AggsigNoQuadraticResidue),
+		-1 => Err(Error::SignatureNoQuadraticResidue),
 		1 => Ok((ret_partsig, None)),
 		2 => Ok((ret_partsig, Some(ret_partsig_alt))),
-		_ => Err(Error::InvalidAggsigSignature)
+		_ => Err(Error::CannotSubtractSignature)
 	}
 }
 
@@ -355,11 +355,11 @@ impl AggSigContext {
 		if ret == 1 {
 			Ok(retsig)
 		} else {
-			Err(Error::PartialSigFailure)
+			Err(Error::CannotCreatePartialSignature)
 		}
 	}
 
-	/// Aggregate multiple signature parts into a single aggregated signature
+	/// Combine multiple partial signatures into a single aggregated signature
 	/// Returns: Ok(Signature) on success
 	/// In:
 	/// partial_sigs: vector of partial signatures
@@ -383,7 +383,7 @@ impl AggSigContext {
 		if ret == 1 {
 			Ok(retsig)
 		} else {
-			Err(Error::PartialSigFailure)
+			Err(Error::CannotCombineSignatures)
 		}
 	}
 
@@ -793,5 +793,60 @@ use crate::ffi;
 			let (res_sig, res_sig_opt) = subtract_partial_signature(&secp, &final_sig, &sig2).unwrap();
 			assert!(res_sig == sig1 || res_sig_opt == Some(sig1));
 		}
+	}
+
+	#[test]
+	fn test_aggsig_wrong_nonce_fails_verification() {
+		let secp = Secp256k1::with_caps(ContextFlag::Full);
+		let (sk1, _) = secp.generate_keypair(&mut thread_rng()).unwrap();
+		let (sk2, pk2) = secp.generate_keypair(&mut thread_rng()).unwrap();
+
+		let secnonce_1 = export_secnonce_single(&secp).unwrap();
+		let secnonce_2 = export_secnonce_single(&secp).unwrap();
+		// Third nonce that party 1 doesn't know about
+		let secnonce_rogue = export_secnonce_single(&secp).unwrap();
+
+		let pubnonce_2 = PublicKey::from_secret_key(&secp, &secnonce_2).unwrap();
+		let mut nonce_sum = pubnonce_2.clone();
+		let _ = nonce_sum.add_exp_assign(&secp, &secnonce_1);
+
+		let mut msg = [0u8; 32];
+		thread_rng().fill(&mut msg);
+		let msg = Message::from_slice(&msg).unwrap();
+
+		let mut pk_sum = pk2.clone();
+		let _ = pk_sum.add_exp_assign(&secp, &sk1);
+
+		// Party 1 signs with correct nonce
+		let sig1 = sign_single(
+			&secp, &msg, &sk1, Some(&secnonce_1), None,
+			Some(&nonce_sum), Some(&pk_sum), Some(&nonce_sum),
+		).unwrap();
+
+		// Party 2 signs with correct nonce
+		let sig2 = sign_single(
+			&secp, &msg, &sk2, Some(&secnonce_2), None,
+			Some(&nonce_sum), Some(&pk_sum), Some(&nonce_sum),
+		).unwrap();
+
+		// Combined sig with correct nonces verifies
+		let final_sig = add_signatures_single(&secp, vec![&sig1, &sig2], &nonce_sum).unwrap();
+		let result = verify_single(
+			&secp, &final_sig, &msg, None, &pk_sum, Some(&pk_sum), None, false,
+		);
+		assert!(result);
+
+		// Now party 1 signs with rogue nonce but claims the correct nonce_sum
+		let rogue_sig1 = sign_single(
+			&secp, &msg, &sk1, Some(&secnonce_rogue), None,
+			Some(&nonce_sum), Some(&pk_sum), Some(&nonce_sum),
+		).unwrap();
+
+		// Combined sig with mismatched nonces should NOT verify
+		let bad_final = add_signatures_single(&secp, vec![&rogue_sig1, &sig2], &nonce_sum).unwrap();
+		let result = verify_single(
+			&secp, &bad_final, &msg, None, &pk_sum, Some(&pk_sum), None, false,
+		);
+		assert!(!result);
 	}
 }

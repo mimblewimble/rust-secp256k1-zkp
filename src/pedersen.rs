@@ -585,203 +585,6 @@ impl Secp256k1 {
 		thread_rng().gen::<[u8; 32]>()
 	}
 
-	/// Produces a range proof for the provided value, using min and max
-	/// bounds, relying
-	/// on the blinding factor and commitment.
-	pub fn range_proof(
-		&self,
-		min: u64,
-		value: u64,
-		blind: SecretKey,
-		commit: Commitment,
-		message: ProofMessage,
-	) -> Result<RangeProof, Error> {
-		let mut proof = [0; constants::MAX_PROOF_SIZE];
-		let mut plen = constants::MAX_PROOF_SIZE as size_t;
-
-		// use a "known key" as the nonce, specifically the blinding factor
-		// of the commitment for which we are generating the range proof
-		// so we can later recover the value and the message by unwinding the range proof
-		// with the same nonce
-		let nonce = blind.clone();
-
-		let extra_commit = [0u8; 33];
-
-		let commit = self.commit_parse(commit.0)?;
-
-		// "This can randomly fail with probability around one in 2^100.
-		// If this happens, buy a lottery ticket and retry."
-		let ret = unsafe {
-			ffi::secp256k1_rangeproof_sign(
-				self.ctx,
-				proof.as_mut_ptr(),
-				&mut plen,
-				min,
-				commit.as_ptr(),
-				blind.as_ptr(),
-				nonce.as_ptr(),
-				0,
-				64,
-				value,
-				message.as_ptr(),
-				message.len(),
-				extra_commit.as_ptr(),
-				0 as size_t,
-				constants::GENERATOR_H.as_ptr(),
-			)
-		};
-		if ret == 1 {
-			return Ok(RangeProof {
-				proof: proof,
-				plen: plen as usize,
-			});
-		}
-		// retry once
-		let ret = unsafe {
-			ffi::secp256k1_rangeproof_sign(
-				self.ctx,
-				proof.as_mut_ptr(),
-				&mut plen,
-				min,
-				commit.as_ptr(),
-				blind.as_ptr(),
-				nonce.as_ptr(),
-				0,
-				64,
-				value,
-				message.as_ptr(),
-				message.len(),
-				extra_commit.as_ptr(),
-				0 as size_t,
-				constants::GENERATOR_H.as_ptr(),
-			)
-		};
-		if ret == 1 {
-			Ok(RangeProof {
-				proof: proof,
-				plen: plen as usize,
-			})
-		} else {
-			Err(Error::CannotMakeRangeProof)
-		}
-	}
-
-	/// Verify a proof that a committed value is within a range.
-	pub fn verify_range_proof(
-		&self,
-		commit: Commitment,
-		proof: RangeProof,
-	) -> Result<ProofRange, Error> {
-		let mut min: u64 = 0;
-		let mut max: u64 = 0;
-
-		let extra_commit = [0u8; 33];
-
-		let commit = self.commit_parse(commit.0)?;
-
-		let ret = unsafe {
-			ffi::secp256k1_rangeproof_verify(
-				self.ctx,
-				&mut min,
-				&mut max,
-				commit.as_ptr(),
-				proof.proof.as_ptr(),
-				proof.plen as size_t,
-				extra_commit.as_ptr(),
-				0 as size_t,
-				constants::GENERATOR_H.as_ptr(),
-			)
-		};
-		if ret == 1 {
-			Ok(ProofRange { min: min, max: max })
-		} else {
-			Err(Error::InvalidRangeProof)
-		}
-	}
-
-	/// Verify a range proof and rewind the proof to recover information
-	/// sent by its author.
-	pub fn rewind_range_proof(
-		&self,
-		commit: Commitment,
-		proof: RangeProof,
-		nonce: SecretKey,
-	) -> Result<ProofInfo, Error> {
-		let mut value: u64 = 0;
-		let mut blind = [0u8; 32];
-		let mut message = [0u8; constants::PROOF_MSG_SIZE];
-		let mut mlen: usize = constants::PROOF_MSG_SIZE;
-		let mut min: u64 = 0;
-		let mut max: u64 = 0;
-
-		let extra_commit = [0u8; 33];
-
-		let commit = self.commit_parse(commit.0)?;
-
-		let ret = unsafe {
-			ffi::secp256k1_rangeproof_rewind(
-				self.ctx,
-				blind.as_mut_ptr(),
-				&mut value,
-				message.as_mut_ptr(),
-				&mut mlen,
-				nonce.as_ptr(),
-				&mut min,
-				&mut max,
-				commit.as_ptr(),
-				proof.proof.as_ptr(),
-				proof.plen as size_t,
-				extra_commit.as_ptr(),
-				0 as size_t,
-				constants::GENERATOR_H.as_ptr(),
-			)
-		};
-
-		Ok(ProofInfo {
-			success: ret == 1,
-			value: value,
-			message: ProofMessage::from_bytes(&message),
-			blinding: SecretKey([0; constants::SECRET_KEY_SIZE]),
-			mlen: mlen,
-			min: min,
-			max: max,
-			exp: 0,
-			mantissa: 0,
-		})
-	}
-
-	/// General information extracted from a range proof. Does not provide any
-	/// information about the value or the message (see rewind).
-	pub fn range_proof_info(&self, proof: RangeProof) -> ProofInfo {
-		let mut exp: i32 = 0;
-		let mut mantissa: i32 = 0;
-		let mut min: u64 = 0;
-		let mut max: u64 = 0;
-
-		let ret = unsafe {
-			ffi::secp256k1_rangeproof_info(
-				self.ctx,
-				&mut exp,
-				&mut mantissa,
-				&mut min,
-				&mut max,
-				proof.proof.as_ptr(),
-				proof.plen as size_t,
-			)
-		};
-		ProofInfo {
-			success: ret == 1,
-			value: 0,
-			message: ProofMessage::empty(),
-			blinding: SecretKey([0; constants::SECRET_KEY_SIZE]),
-			mlen: 0,
-			min: min,
-			max: max,
-			exp: exp,
-			mantissa: mantissa,
-		}
-	}
-
 	/// Produces a bullet proof for the provided value, using min and max
 	/// bounds, relying on the blinding factor and value. If a message is passed,
 	/// it will be truncated or padded to exactly BULLET_PROOF_MSG_SIZE bytes
@@ -1184,19 +987,131 @@ impl Secp256k1 {
 			Err(Error::CannotRewindBulletproof)
 		}
 	}
+
+	// Legacy Borromean range proofs (unused by grin)
+
+	/// Produces a range proof for the provided value, using min and max
+	/// bounds, relying on the blinding factor and commitment.
+	#[cfg(feature = "borromean")]
+	pub fn range_proof(
+		&self,
+		min: u64,
+		value: u64,
+		blind: SecretKey,
+		commit: Commitment,
+		message: ProofMessage,
+	) -> Result<RangeProof, Error> {
+		let mut proof = [0; constants::MAX_PROOF_SIZE];
+		let mut plen = constants::MAX_PROOF_SIZE as size_t;
+		let nonce = blind.clone();
+		let extra_commit = [0u8; 33];
+		let commit = self.commit_parse(commit.0)?;
+		let ret = unsafe {
+			ffi::secp256k1_rangeproof_sign(
+				self.ctx, proof.as_mut_ptr(), &mut plen, min,
+				commit.as_ptr(), blind.as_ptr(), nonce.as_ptr(),
+				0, 64, value, message.as_ptr(), message.len(),
+				extra_commit.as_ptr(), 0 as size_t, constants::GENERATOR_H.as_ptr(),
+			)
+		};
+		if ret == 1 {
+			return Ok(RangeProof { proof, plen: plen as usize });
+		}
+		let ret = unsafe {
+			ffi::secp256k1_rangeproof_sign(
+				self.ctx, proof.as_mut_ptr(), &mut plen, min,
+				commit.as_ptr(), blind.as_ptr(), nonce.as_ptr(),
+				0, 64, value, message.as_ptr(), message.len(),
+				extra_commit.as_ptr(), 0 as size_t, constants::GENERATOR_H.as_ptr(),
+			)
+		};
+		if ret == 1 {
+			Ok(RangeProof { proof, plen: plen as usize })
+		} else {
+			Err(Error::CannotMakeRangeProof)
+		}
+	}
+
+	/// Verify a proof that a committed value is within a range.
+	#[cfg(feature = "borromean")]
+	pub fn verify_range_proof(
+		&self, commit: Commitment, proof: RangeProof,
+	) -> Result<ProofRange, Error> {
+		let mut min: u64 = 0;
+		let mut max: u64 = 0;
+		let extra_commit = [0u8; 33];
+		let commit = self.commit_parse(commit.0)?;
+		let ret = unsafe {
+			ffi::secp256k1_rangeproof_verify(
+				self.ctx, &mut min, &mut max, commit.as_ptr(),
+				proof.proof.as_ptr(), proof.plen as size_t,
+				extra_commit.as_ptr(), 0 as size_t, constants::GENERATOR_H.as_ptr(),
+			)
+		};
+		if ret == 1 { Ok(ProofRange { min, max }) } else { Err(Error::InvalidRangeProof) }
+	}
+
+	/// Verify a range proof and rewind the proof to recover information
+	/// sent by its author.
+	#[cfg(feature = "borromean")]
+	pub fn rewind_range_proof(
+		&self, commit: Commitment, proof: RangeProof, nonce: SecretKey,
+	) -> Result<ProofInfo, Error> {
+		let mut value: u64 = 0;
+		let mut blind = [0u8; 32];
+		let mut message = [0u8; constants::PROOF_MSG_SIZE];
+		let mut mlen: usize = constants::PROOF_MSG_SIZE;
+		let mut min: u64 = 0;
+		let mut max: u64 = 0;
+		let extra_commit = [0u8; 33];
+		let commit = self.commit_parse(commit.0)?;
+		let ret = unsafe {
+			ffi::secp256k1_rangeproof_rewind(
+				self.ctx, blind.as_mut_ptr(), &mut value, message.as_mut_ptr(),
+				&mut mlen, nonce.as_ptr(), &mut min, &mut max, commit.as_ptr(),
+				proof.proof.as_ptr(), proof.plen as size_t,
+				extra_commit.as_ptr(), 0 as size_t, constants::GENERATOR_H.as_ptr(),
+			)
+		};
+		Ok(ProofInfo {
+			success: ret == 1, value, message: ProofMessage::from_bytes(&message),
+			blinding: SecretKey([0; constants::SECRET_KEY_SIZE]),
+			mlen, min, max, exp: 0, mantissa: 0,
+		})
+	}
+
+	/// General information extracted from a range proof. Does not provide any
+	/// information about the value or the message (see rewind).
+	#[cfg(feature = "borromean")]
+	pub fn range_proof_info(&self, proof: RangeProof) -> ProofInfo {
+		let mut exp: i32 = 0;
+		let mut mantissa: i32 = 0;
+		let mut min: u64 = 0;
+		let mut max: u64 = 0;
+		let ret = unsafe {
+			ffi::secp256k1_rangeproof_info(
+				self.ctx, &mut exp, &mut mantissa, &mut min, &mut max,
+				proof.proof.as_ptr(), proof.plen as size_t,
+			)
+		};
+		ProofInfo {
+			success: ret == 1, value: 0, message: ProofMessage::empty(),
+			blinding: SecretKey([0; constants::SECRET_KEY_SIZE]),
+			mlen: 0, min, max, exp, mantissa,
+		}
+	}
 }
 
 #[cfg(test)]
 mod tests {
-	extern crate chrono;
 	use super::{Commitment, Error, Message, ProofMessage, ProofRange, RangeProof, Secp256k1};
 	use crate::key::{PublicKey, SecretKey, ONE_KEY, ZERO_KEY};
 	use crate::ContextFlag;
 	use crate::constants;
 
+	use chrono::prelude::*;
 	use rand::{thread_rng, Rng};
 
-	use crate::pedersen::tests::chrono::prelude::*;
 
 	#[test]
 	fn commit_parse_ser() {
@@ -1441,6 +1356,7 @@ mod tests {
 	}
 
 	#[test]
+	#[cfg(feature = "borromean")]
 	fn test_range_proof() {
 		let secp = Secp256k1::with_caps(ContextFlag::Commit);
 		let blinding = SecretKey::new(&secp, &mut thread_rng());
@@ -2114,5 +2030,120 @@ mod tests {
 		let json = serde_json::to_string(&too_long).unwrap();
 		let result: Result<RangeProof, _> = serde_json::from_str(&json);
 		assert!(result.is_err());
+	}
+
+	#[test]
+	fn bullet_proof_rejects_invalid_blinding() {
+		let secp = Secp256k1::with_caps(ContextFlag::Commit);
+		let value = 100u64;
+		let blinding = SecretKey::new(&secp, &mut thread_rng());
+		let nonce = SecretKey::new(&secp, &mut thread_rng());
+
+		assert!(secp.bullet_proof(value, blinding.clone(), nonce.clone(), nonce.clone(), None, None).is_ok());
+
+		let wrong_blinding = SecretKey::new(&secp, &mut thread_rng());
+		let commit = secp.commit(value, blinding.clone()).unwrap();
+		let wrong_proof = secp.bullet_proof(
+			value, wrong_blinding, nonce.clone(), nonce.clone(), None, None,
+		).unwrap();
+		assert!(secp.verify_bullet_proof(commit, wrong_proof, None).is_err());
+	}
+
+	#[test]
+	fn verify_bullet_proof_rejects_tampered_proof() {
+		let secp = Secp256k1::with_caps(ContextFlag::Commit);
+		let value = 42u64;
+		let blinding = SecretKey::new(&secp, &mut thread_rng());
+		let nonce = SecretKey::new(&secp, &mut thread_rng());
+
+		let commit = secp.commit(value, blinding.clone()).unwrap();
+		let proof = secp.bullet_proof(
+			value, blinding.clone(), nonce.clone(), nonce.clone(), None, None,
+		).unwrap();
+		assert!(secp.verify_bullet_proof(commit, proof, None).is_ok());
+
+		let mut tampered = proof;
+		tampered.proof[tampered.plen / 2] ^= 0x01;
+		assert!(secp.verify_bullet_proof(commit, tampered, None).is_err());
+
+		let mut truncated = proof;
+		truncated.plen = proof.plen / 2;
+		assert!(secp.verify_bullet_proof(commit, truncated, None).is_err());
+
+		let wrong_commit = secp.commit(value + 1, blinding.clone()).unwrap();
+		assert!(secp.verify_bullet_proof(wrong_commit, proof, None).is_err());
+	}
+
+	#[test]
+	fn bullet_proof_rewind_wrong_nonce() {
+		let secp = Secp256k1::with_caps(ContextFlag::Commit);
+		let value = 12345u64;
+		let blinding = SecretKey::new(&secp, &mut thread_rng());
+		let nonce = SecretKey::new(&secp, &mut thread_rng());
+		let wrong_nonce = SecretKey::new(&secp, &mut thread_rng());
+
+		let commit = secp.commit(value, blinding.clone()).unwrap();
+		let proof = secp.bullet_proof(
+			value, blinding.clone(), nonce.clone(), nonce.clone(), None, None,
+		).unwrap();
+
+		let info = secp.rewind_bullet_proof(commit, nonce, None, proof).unwrap();
+		assert_eq!(info.value, value);
+		assert_eq!(info.blinding, blinding);
+
+		assert!(secp.rewind_bullet_proof(commit, wrong_nonce, None, proof).is_err());
+	}
+
+	#[test]
+	fn range_proof_value_commitment_binding() {
+		let secp = Secp256k1::with_caps(ContextFlag::Commit);
+		let blinding = SecretKey::new(&secp, &mut thread_rng());
+		let nonce = SecretKey::new(&secp, &mut thread_rng());
+		let value = 1000u64;
+
+		let proof = secp.bullet_proof(
+			value, blinding.clone(), nonce.clone(), nonce.clone(), None, None,
+		).unwrap();
+
+		let correct_commit = secp.commit(value, blinding.clone()).unwrap();
+		assert!(secp.verify_bullet_proof(correct_commit, proof, None).is_ok());
+
+		let inflated = secp.commit(value + 1, blinding.clone()).unwrap();
+		assert!(secp.verify_bullet_proof(inflated, proof, None).is_err());
+
+		let deflated = secp.commit(value - 1, blinding.clone()).unwrap();
+		assert!(secp.verify_bullet_proof(deflated, proof, None).is_err());
+	}
+
+	#[test]
+	fn inflation_via_transaction_simulation() {
+		let secp = Secp256k1::with_caps(ContextFlag::Commit);
+		let nonce = SecretKey::new(&secp, &mut thread_rng());
+
+		let blind_in = SecretKey::new(&secp, &mut thread_rng());
+		let blind_out1 = SecretKey::new(&secp, &mut thread_rng());
+		let blind_out2 = secp.blind_sum(vec![blind_in.clone()], vec![blind_out1.clone()]).unwrap();
+
+		let commit_in = secp.commit(100, blind_in.clone()).unwrap();
+		let commit_out1 = secp.commit(60, blind_out1.clone()).unwrap();
+		let commit_out2 = secp.commit(40, blind_out2.clone()).unwrap();
+
+		let proof1 = secp.bullet_proof(
+			60, blind_out1.clone(), nonce.clone(), nonce.clone(), None, None,
+		).unwrap();
+		let proof2 = secp.bullet_proof(
+			40, blind_out2.clone(), nonce.clone(), nonce.clone(), None, None,
+		).unwrap();
+
+		assert!(secp.verify_commit_sum(vec![commit_in], vec![commit_out1, commit_out2]));
+		assert!(secp.verify_bullet_proof(commit_out1, proof1, None).is_ok());
+		assert!(secp.verify_bullet_proof(commit_out2, proof2, None).is_ok());
+
+		let inflated_commit = secp.commit(61, blind_out1.clone()).unwrap();
+		let inflated_proof = secp.bullet_proof(
+			61, blind_out1.clone(), nonce.clone(), nonce.clone(), None, None,
+		).unwrap();
+		assert!(secp.verify_bullet_proof(inflated_commit, inflated_proof, None).is_ok());
+		assert!(!secp.verify_commit_sum(vec![commit_in], vec![inflated_commit, commit_out2]));
 	}
 }
