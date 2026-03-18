@@ -168,7 +168,7 @@ impl PublicKey {
         .collect();
         unsafe {
             if ffi::secp256k1_ec_pubkey_combine(secp.ctx, &mut retkey.0 as *mut _,
-                                                  in_vec.as_ptr(), in_vec.len() as i32) == 1 {
+                                                  in_vec.as_ptr(), in_vec.len()) == 1 {
                 Ok(retkey)
             } else {
                 Err(InvalidPublicKey)
@@ -208,7 +208,7 @@ impl PublicKey {
         if secp.caps == ContextFlag::VerifyOnly || secp.caps == ContextFlag::None {
             return Err(IncapableContext);
         }
-        let mut pk = unsafe { ffi::PublicKey::blank() };
+        let mut pk = ffi::PublicKey::new();
         unsafe {
             // We can assume the return value because it's not possible to construct
             // an invalid `SecretKey` without transmute trickery or something
@@ -222,7 +222,7 @@ impl PublicKey {
     #[inline]
     pub fn from_slice(secp: &Secp256k1, data: &[u8])
                       -> Result<PublicKey, Error> {
-        let mut pk = unsafe { ffi::PublicKey::blank() };
+        let mut pk = ffi::PublicKey::new();
         unsafe {
             if ffi::secp256k1_ec_pubkey_parse(secp.ctx, &mut pk, data.as_ptr(),
                                               data.len() as ::libc::size_t) == 1 {
@@ -243,7 +243,7 @@ impl PublicKey {
         unsafe {
             let mut ret_len = constants::PUBLIC_KEY_SIZE as ::libc::size_t;
             let compressed = if compressed { ffi::SECP256K1_SER_COMPRESSED } else { ffi::SECP256K1_SER_UNCOMPRESSED };
-            let err = ffi::secp256k1_ec_pubkey_serialize(secp.ctx, ret.as_ptr(),
+            let err = ffi::secp256k1_ec_pubkey_serialize(secp.ctx, ret.as_mut_ptr(),
                                                          &mut ret_len, self.as_ptr(),
                                                          compressed);
             debug_assert_eq!(err, 1);
@@ -314,34 +314,31 @@ impl<'de> Deserialize<'de> for PublicKey {
                 debug_assert!(constants::UNCOMPRESSED_PUBLIC_KEY_SIZE >= constants::COMPRESSED_PUBLIC_KEY_SIZE);
 
                 let s = Secp256k1::with_caps(crate::ContextFlag::None);
-                unsafe {
-                    use std::mem;
-                    let mut ret: [u8; constants::UNCOMPRESSED_PUBLIC_KEY_SIZE] = mem::MaybeUninit::uninit().assume_init();
+                let mut ret = [0u8; constants::UNCOMPRESSED_PUBLIC_KEY_SIZE];
 
-                    let mut read_len = 0;
-                    while read_len < constants::UNCOMPRESSED_PUBLIC_KEY_SIZE {
-                        let read_ch = match a.next_element()? {
-                            Some(c) => c,
-                            None => break
-                        };
-                        ret[read_len] = read_ch;
-                        read_len += 1;
-                    }
-                    let one_after_last : Option<u8> = a.next_element()?;
-                    if one_after_last.is_some() {
-                        return Err(de::Error::invalid_length(read_len + 1, &self));
-                    }
+                let mut read_len = 0;
+                while read_len < constants::UNCOMPRESSED_PUBLIC_KEY_SIZE {
+                    let read_ch = match a.next_element()? {
+                        Some(c) => c,
+                        None => break
+                    };
+                    ret[read_len] = read_ch;
+                    read_len += 1;
+                }
+                let one_after_last : Option<u8> = a.next_element()?;
+                if one_after_last.is_some() {
+                    return Err(de::Error::invalid_length(read_len + 1, &self));
+                }
 
-                    match read_len {
-                        constants::UNCOMPRESSED_PUBLIC_KEY_SIZE | constants::COMPRESSED_PUBLIC_KEY_SIZE
-                            => PublicKey::from_slice(&s, &ret[..read_len]).map_err(
-                                |e| match e {
-                                        InvalidPublicKey => de::Error::invalid_value(de::Unexpected::Seq, &self),
-                                        _ => de::Error::custom(&e.to_string()),
-                                    }
-                                ),
-                        _ => Err(de::Error::invalid_length(read_len, &self)),
-                    }
+                match read_len {
+                    constants::UNCOMPRESSED_PUBLIC_KEY_SIZE | constants::COMPRESSED_PUBLIC_KEY_SIZE
+                        => PublicKey::from_slice(&s, &ret[..read_len]).map_err(
+                            |e| match e {
+                                    InvalidPublicKey => de::Error::invalid_value(de::Unexpected::Seq, &self),
+                                    _ => de::Error::custom(&e.to_string()),
+                                }
+                            ),
+                    _ => Err(de::Error::invalid_length(read_len, &self)),
                 }
             }
 
@@ -654,10 +651,26 @@ mod test {
 
         let s = Secp256k1::new();
         let (_, pk1) = s.generate_keypair(&mut DumbRng(0)).unwrap();
-        assert_eq!(&pk1.serialize_vec(&s, false)[..],
-                   &[4, 124, 121, 49, 14, 253, 63, 197, 50, 39, 194, 107, 17, 193, 219, 108, 154, 126, 9, 181, 248, 2, 12, 149, 233, 198, 71, 149, 134, 250, 184, 154, 229, 185, 28, 165, 110, 27, 3, 162, 126, 238, 167, 157, 242, 221, 76, 251, 237, 34, 231, 72, 39, 245, 3, 191, 64, 111, 170, 117, 103, 82, 28, 102, 163][..]);
-        assert_eq!(&pk1.serialize_vec(&s, true)[..],
-                   &[3, 124, 121, 49, 14, 253, 63, 197, 50, 39, 194, 107, 17, 193, 219, 108, 154, 126, 9, 181, 248, 2, 12, 149, 233, 198, 71, 149, 134, 250, 184, 154, 229][..]);
+        let expected_uncompressed: [u8; 65] = [
+            0x04,
+            0x7c, 0x79, 0x31, 0x0e, 0xfd, 0x3f, 0xc5, 0x32,
+            0x27, 0xc2, 0x6b, 0x11, 0xc1, 0xdb, 0x6c, 0x9a,
+            0x7e, 0x09, 0xb5, 0xf8, 0x02, 0x0c, 0x95, 0xe9,
+            0xc6, 0x47, 0x95, 0x86, 0xfa, 0xb8, 0x9a, 0xe5,
+            0xb9, 0x1c, 0xa5, 0x6e, 0x1b, 0x03, 0xa2, 0x7e,
+            0xee, 0xa7, 0x9d, 0xf2, 0xdd, 0x4c, 0xfb, 0xed,
+            0x22, 0xe7, 0x48, 0x27, 0xf5, 0x03, 0xbf, 0x40,
+            0x6f, 0xaa, 0x75, 0x67, 0x52, 0x1c, 0x66, 0xa3,
+        ];
+        let expected_compressed: [u8; 33] = [
+            0x03,
+            0x7c, 0x79, 0x31, 0x0e, 0xfd, 0x3f, 0xc5, 0x32,
+            0x27, 0xc2, 0x6b, 0x11, 0xc1, 0xdb, 0x6c, 0x9a,
+            0x7e, 0x09, 0xb5, 0xf8, 0x02, 0x0c, 0x95, 0xe9,
+            0xc6, 0x47, 0x95, 0x86, 0xfa, 0xb8, 0x9a, 0xe5,
+        ];
+        assert_eq!(pk1.serialize_vec(&s, false).as_slice(), &expected_uncompressed);
+        assert_eq!(pk1.serialize_vec(&s, true).as_slice(), &expected_compressed);
     }
 
     #[test]
@@ -719,7 +732,8 @@ mod test {
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01]).unwrap();
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01,
+        ]).unwrap();
 
         let mut one_inv: SecretKey = one.clone();
         one_inv.inv_assign(&s).unwrap();
@@ -767,7 +781,8 @@ mod test {
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01]).unwrap();
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01,
+        ]).unwrap();
 
         let (mut sk1, _) = s.generate_keypair(&mut thread_rng()).unwrap();
         let mut sk2: SecretKey = one.clone();

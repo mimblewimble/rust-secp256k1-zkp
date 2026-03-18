@@ -72,15 +72,8 @@ macro_rules! impl_array_newtype {
         impl Clone for $thing {
             #[inline]
             fn clone(&self) -> $thing {
-                unsafe {
-                    use std::ptr::copy_nonoverlapping;
-                    use std::mem;
-                    let mut ret: $thing = mem::MaybeUninit::uninit().assume_init();
-                    copy_nonoverlapping(self.as_ptr(),
-                                        ret.as_mut_ptr(),
-                                        mem::size_of::<$thing>());
-                    ret
-                }
+                let &$thing(ref dat) = self;
+                $thing(dat.clone())
             }
         }
 
@@ -160,21 +153,18 @@ macro_rules! impl_array_newtype {
                     fn visit_seq<A>(self, mut a: A) -> Result<$thing, A::Error>
                         where A: ::serde::de::SeqAccess<'de>
                     {
-                        unsafe {
-                            use std::mem;
-                            let mut ret: [$ty; $len] = mem::MaybeUninit::uninit().assume_init();
-                            for i in 0..$len {
-                                ret[i] = match a.next_element()? {
-                                    Some(c) => c,
-                                    None => return Err(::serde::de::Error::invalid_length(i, &self))
-                                };
-                            }
-                            let one_after_last : Option<u8> = a.next_element()?;
-                            if one_after_last.is_some() {
-                                return Err(::serde::de::Error::invalid_length($len + 1, &self));
-                            }
-                            Ok($thing(ret))
+                        let mut ret: [$ty; $len] = [0; $len];
+                        for i in 0..$len {
+                            ret[i] = match a.next_element()? {
+                                Some(c) => c,
+                                None => return Err(::serde::de::Error::invalid_length(i, &self))
+                            };
                         }
+                        let one_after_last : Option<u8> = a.next_element()?;
+                        if one_after_last.is_some() {
+                            return Err(::serde::de::Error::invalid_length($len + 1, &self));
+                        }
+                        Ok($thing(ret))
                     }
 
                     fn expecting(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
@@ -222,14 +212,6 @@ macro_rules! impl_raw_debug {
             }
         }
      }
-}
-
-macro_rules! map_vec {
-  ($thing:expr, $mapfn:expr ) => {
-    $thing.iter()
-      .map($mapfn)
-      .collect::<Vec<_>>()
-  }
 }
 
 #[cfg(test)]

@@ -16,8 +16,6 @@
 //! # FFI bindings
 //! Direct bindings to the underlying C library functions. These should
 //! not be needed for most users.
-use std::mem;
-
 use libc::{c_int, c_uchar, c_uint, c_void, size_t};
 
 /// Flag for context to enable no precomputation
@@ -42,32 +40,32 @@ pub type NonceFn = unsafe extern "C" fn(nonce32: *mut c_uchar,
                                         msg32: *const c_uchar,
                                         key32: *const c_uchar,
                                         algo16: *const c_uchar,
-                                        attempt: c_uint,
-                                        data: *const c_void);
+                                        data: *mut c_void,
+                                        attempt: c_uint);
 
 
 /// A Secp256k1 context, containing various precomputed values and such
 /// needed to do elliptic curve computations. If you create one of these
 /// with `secp256k1_context_create` you MUST destroy it with
 /// `secp256k1_context_destroy`, or else you will have a memory leak.
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 #[repr(C)] pub struct Context(c_int);
 
 /// Secp256k1 aggsig context. As above, needs to be destroyed with
 /// `secp256k1_aggsig_context_destroy`
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 #[repr(C)] pub struct AggSigContext(c_int);
 
 /// Secp256k1 scratch space
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 #[repr(C)] pub struct ScratchSpace(c_int);
 
 /// Secp256k1 bulletproof generators
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 #[repr(C)] pub struct BulletproofGenerators(c_int);
 
 /// Generator
-#[repr(C)] 
+#[repr(C)]
 pub struct Generator(pub [c_uchar; 64]);
 impl Copy for Generator {}
 impl_array_newtype!(Generator, c_uchar, 64);
@@ -83,8 +81,6 @@ impl_raw_debug!(PublicKey);
 impl PublicKey {
     /// Create a new (zeroed) public key usable for the FFI interface
     pub fn new() -> PublicKey { PublicKey([0; 64]) }
-    /// Create a new (uninitialized) public key usable for the FFI interface
-    pub unsafe fn blank() -> PublicKey { mem::MaybeUninit::uninit().assume_init() }
 }
 
 /// Library-internal representation of a Secp256k1 signature
@@ -113,22 +109,16 @@ impl Signature {
     pub fn new() -> Signature { Signature([0; 64]) }
     /// Create a signature from raw data
     pub fn from_data(data: [u8; 64]) -> Signature { Signature(data) }
-    /// Create a new (uninitialized) signature usable for the FFI interface
-    pub unsafe fn blank() -> Signature { mem::MaybeUninit::uninit().assume_init() }
 }
 
 impl RecoverableSignature {
     /// Create a new (zeroed) signature usable for the FFI interface
     pub fn new() -> RecoverableSignature { RecoverableSignature([0; 65]) }
-    /// Create a new (uninitialized) signature usable for the FFI interface
-    pub unsafe fn blank() -> RecoverableSignature { mem::MaybeUninit::uninit().assume_init() }
 }
 
 impl AggSigPartialSignature {
     /// Create a new (zeroed) aggsig partial signature usable for the FFI interface
     pub fn new() -> AggSigPartialSignature { AggSigPartialSignature([0; 32]) }
-    /// Create a new (uninitialized) signature usable for the FFI interface
-    pub unsafe fn blank() -> AggSigPartialSignature { mem::MaybeUninit::uninit().assume_init() }
 }
 
 /// Library-internal representation of an ECDH shared secret
@@ -138,13 +128,14 @@ impl_array_newtype!(SharedSecret, c_uchar, 32);
 impl_raw_debug!(SharedSecret);
 
 impl SharedSecret {
-    /// Create a new (zeroed) signature usable for the FFI interface
+    /// Create a new (zeroed) shared secret usable for the FFI interface
     pub fn new() -> SharedSecret { SharedSecret([0; 32]) }
-    /// Create a new (uninitialized) signature usable for the FFI interface
-    pub unsafe fn blank() -> SharedSecret { mem::MaybeUninit::uninit().assume_init() }
 }
 
 
+// Raw C bindings
+// Safe rust wrappers in lib.rs for docs
+#[allow(missing_docs)]
 extern "C" {
     pub static secp256k1_nonce_function_rfc6979: NonceFn;
 
@@ -153,7 +144,7 @@ extern "C" {
     // Contexts
     pub fn secp256k1_context_create(flags: c_uint) -> *mut Context;
 
-    pub fn secp256k1_context_clone(cx: *mut Context) -> *mut Context;
+    pub fn secp256k1_context_clone(cx: *const Context) -> *mut Context;
 
     pub fn secp256k1_context_destroy(cx: *mut Context);
 
@@ -161,7 +152,7 @@ extern "C" {
                                        seed32: *const c_uchar)
                                        -> c_int;
     // Scratch space
-    pub fn secp256k1_scratch_space_create(cx: *mut Context,
+    pub fn secp256k1_scratch_space_create(cx: *const Context,
                                           max_size: size_t)
                                           -> *mut ScratchSpace;
 
@@ -185,7 +176,7 @@ extern "C" {
                                      input: *const c_uchar, in_len: size_t)
                                      -> c_int;
 
-    pub fn secp256k1_ec_pubkey_serialize(cx: *const Context, output: *const c_uchar,
+    pub fn secp256k1_ec_pubkey_serialize(cx: *const Context, output: *mut c_uchar,
                                          out_len: *mut size_t, pk: *const PublicKey,
                                          compressed: c_uint)
                                          -> c_int;
@@ -203,11 +194,11 @@ extern "C" {
                                          input: *const c_uchar, in_len: size_t)
                                          -> c_int;
 
-    pub fn secp256k1_ecdsa_signature_serialize_der(cx: *const Context, output: *const c_uchar,
+    pub fn secp256k1_ecdsa_signature_serialize_der(cx: *const Context, output: *mut c_uchar,
                                                    out_len: *mut size_t, sig: *const Signature)
                                                    -> c_int;
 
-    pub fn secp256k1_ecdsa_signature_serialize_compact(cx: *const Context, output64: *const c_uchar,
+    pub fn secp256k1_ecdsa_signature_serialize_compact(cx: *const Context, output64: *mut c_uchar,
                                                        sig: *const Signature)
                                                        -> c_int;
 
@@ -215,7 +206,7 @@ extern "C" {
                                                                input64: *const c_uchar, recid: c_int)
                                                                -> c_int;
 
-    pub fn secp256k1_ecdsa_recoverable_signature_serialize_compact(cx: *const Context, output64: *const c_uchar,
+    pub fn secp256k1_ecdsa_recoverable_signature_serialize_compact(cx: *const Context, output64: *mut c_uchar,
                                                                    recid: *mut c_int, sig: *const RecoverableSignature)
                                                                    -> c_int;
 
@@ -316,7 +307,7 @@ extern "C" {
                                           pk: *const PublicKey,
                                           pk_total: *const PublicKey,
                                           extra_pubkey: *const PublicKey,
-                                          is_partial: c_uint)
+                                          is_partial: c_int)
                                            -> c_int;
 
     pub fn secp256k1_schnorrsig_verify_batch(cx: *const Context,
@@ -374,7 +365,7 @@ extern "C" {
     pub fn secp256k1_ec_pubkey_combine(cx: *const Context,
                                        out: *mut PublicKey,
                                        ins: *const *const PublicKey,
-                                       n: c_int)
+                                       n: size_t)
                                        -> c_int;
 
     pub fn secp256k1_ec_privkey_tweak_inv(cx: *const Context,
@@ -391,21 +382,21 @@ extern "C" {
                           scalar: *const c_uchar)
                           -> c_int;
 
-  // Parse a 33-byte commitment into 64 byte internal commitment object
+  /// Parse a 33-byte commitment into 64 byte internal commitment object
   pub fn secp256k1_pedersen_commitment_parse(cx: *const Context,
                                               commit: *mut c_uchar,
                                               input: *const c_uchar)
                                               -> c_int;
 
-  // Serialize a 64-byte commit object into a 33 byte serialized byte sequence
+  /// Serialize a 64-byte commit object into a 33 byte serialized byte sequence
   pub fn secp256k1_pedersen_commitment_serialize(cx: *const Context,
                                                   output: *mut c_uchar,
                                                   commit: *const c_uchar)
                                                   -> c_int;
 
 
-	// Generates a pedersen commitment: *commit = blind * G + value * G2.
-	// The commitment is 33 bytes, the blinding factor is 32 bytes.
+	/// Generates a pedersen commitment: *commit = blind * G + value * G2.
+	/// The commitment is 33 bytes, the blinding factor is 32 bytes.
 	pub fn secp256k1_pedersen_commit(
 		ctx: *const Context,
 		commit: *mut c_uchar,
@@ -415,8 +406,8 @@ extern "C" {
 		blind_gen: *const c_uchar
 	) -> c_int;
 
-	// Generates a pedersen commitment: *commit = blind * G + value * G2.
-	// The commitment is 33 bytes, the blinding factor and the value are 32 bytes.
+	/// Generates a pedersen commitment: *commit = blind * G + value * G2.
+	/// The commitment is 33 bytes, the blinding factor and the value are 32 bytes.
 	pub fn secp256k1_pedersen_blind_commit(
 		ctx: *const Context,
 		commit: *mut c_uchar,
@@ -426,39 +417,39 @@ extern "C" {
 		blind_gen: *const c_uchar
 	) -> c_int;
 
-	// Get the public key of a pedersen commitment
+	/// Get the public key of a pedersen commitment
 	pub fn secp256k1_pedersen_commitment_to_pubkey(
 	    cx: *const Context, pk: *mut PublicKey,
 	    commit: *const c_uchar) -> c_int;
 
-	// Get a pedersen commitment from a pubkey
+	/// Get a pedersen commitment from a pubkey
 	pub fn secp256k1_pubkey_to_pedersen_commitment(
 	    cx: *const Context, commit: *mut c_uchar,
 	    pk: *const PublicKey) -> c_int;
 
-	// Takes a list of n pointers to 32 byte blinding values, the first negs
-	// of which are treated with positive sign and the rest negative, then
-	// calculates an additional blinding value that adds to zero.
+	/// Takes a list of n pointers to 32 byte blinding values, the first negs
+	/// of which are treated with positive sign and the rest negative, then
+	/// calculates an additional blinding value that adds to zero.
 	pub fn secp256k1_pedersen_blind_sum(
 		ctx: *const Context,
-		blind_out: *const c_uchar,
+		blind_out: *mut c_uchar,
 		blinds: *const *const c_uchar,
 		n: size_t,
 		npositive: size_t
 	) -> c_int;
 
-	// Takes two list of 64-byte commitments and sums the first set, subtracts
-	// the second and returns the resulting commitment.
+	/// Takes two list of 64-byte commitments and sums the first set, subtracts
+	/// the second and returns the resulting commitment.
 	pub fn secp256k1_pedersen_commit_sum(
 		ctx: *const Context,
-		commit_out: *const c_uchar,
+		commit_out: *mut c_uchar,
 		commits: *const *const c_uchar,
 		pcnt: size_t,
 		ncommits: *const *const c_uchar,
 		ncnt: size_t
 	) -> c_int;
 
-    // Calculate blinding factor for switch commitment x + H(xG+vH | xJ)
+    /// Calculate blinding factor for switch commitment x + H(xG+vH | xJ)
     pub fn secp256k1_blind_switch(
         ctx: *const Context,
         blind_switch: *mut c_uchar,
@@ -469,8 +460,8 @@ extern "C" {
         switch_pubkey: *const c_uchar
     ) -> c_int;
 
-	// Takes two list of 64-byte commitments and sums the first set and
-	// subtracts the second and verifies that they sum to 0.
+	/// Takes two list of 64-byte commitments and sums the first set and
+	/// subtracts the second and verifies that they sum to 0.
 	pub fn secp256k1_pedersen_verify_tally(ctx: *const Context,
 		commits: *const *const c_uchar,
 		pcnt: size_t,
@@ -507,8 +498,8 @@ extern "C" {
 
 	pub fn secp256k1_rangeproof_verify(
 		ctx: *const Context,
-		min_value: &mut u64,
-		max_value: &mut u64,
+		min_value: *mut u64,
+		max_value: *mut u64,
 		commit: *const c_uchar,
 		proof: *const c_uchar,
 		plen: size_t,

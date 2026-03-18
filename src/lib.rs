@@ -113,7 +113,7 @@ impl Signature {
     #[inline]
     /// Converts a DER-encoded byte slice to a signature
     pub fn from_der(secp: &Secp256k1, data: &[u8]) -> Result<Signature, Error> {
-        let mut ret = unsafe { ffi::Signature::blank() };
+        let mut ret = ffi::Signature::new();
 
         unsafe {
             if ffi::secp256k1_ecdsa_signature_parse_der(secp.ctx, &mut ret,
@@ -127,7 +127,7 @@ impl Signature {
 
     /// Converts a 64-byte compact-encoded byte slice to a signature
     pub fn from_compact(secp: &Secp256k1, data: &[u8]) -> Result<Signature, Error> {
-        let mut ret = unsafe { ffi::Signature::blank() };
+        let mut ret = ffi::Signature::new();
         if data.len() != 64 {
             return Err(Error::InvalidSignature);
         }
@@ -153,7 +153,7 @@ impl Signature {
     /// support serializing to this "format"
     pub fn from_der_lax(secp: &Secp256k1, data: &[u8]) -> Result<Signature, Error> {
         unsafe {
-            let mut ret = ffi::Signature::blank();
+            let mut ret = ffi::Signature::new();
             if ffi::ecdsa_signature_parse_der_lax(secp.ctx, &mut ret,
                                                   data.as_ptr(), data.len() as libc::size_t) == 1 {
                 Ok(Signature(ret))
@@ -259,28 +259,25 @@ impl<'de> serde::Deserialize<'de> for Signature {
                 where A: de::SeqAccess<'de>
             {
                 let s = Secp256k1::with_caps(crate::ContextFlag::None);
-                unsafe {
-                    use std::mem;
-                    let mut ret: [u8; constants::COMPACT_SIGNATURE_SIZE] = mem::MaybeUninit::uninit().assume_init();
+                let mut ret = [0u8; constants::COMPACT_SIGNATURE_SIZE];
 
-                    for i in 0..constants::COMPACT_SIGNATURE_SIZE {
-                        ret[i] = match a.next_element()? {
-                            Some(c) => c,
-                            None => return Err(::serde::de::Error::invalid_length(i, &self))
-                        };
-                    }
-                    let one_after_last : Option<u8> = a.next_element()?;
-                    if one_after_last.is_some() {
-                        return Err(serde::de::Error::invalid_length(constants::COMPACT_SIGNATURE_SIZE + 1, &self));
-                    }
-
-                    Signature::from_compact(&s, &ret).map_err(
-                        |e| match e {
-                            Error::InvalidSignature => de::Error::invalid_value(de::Unexpected::Seq, &self),
-                            _ => de::Error::custom(&e.to_string()),
-                        }
-                    )
+                for i in 0..constants::COMPACT_SIGNATURE_SIZE {
+                    ret[i] = match a.next_element()? {
+                        Some(c) => c,
+                        None => return Err(::serde::de::Error::invalid_length(i, &self))
+                    };
                 }
+                let one_after_last : Option<u8> = a.next_element()?;
+                if one_after_last.is_some() {
+                    return Err(serde::de::Error::invalid_length(constants::COMPACT_SIGNATURE_SIZE + 1, &self));
+                }
+
+                Signature::from_compact(&s, &ret).map_err(
+                    |e| match e {
+                        Error::InvalidSignature => de::Error::invalid_value(de::Unexpected::Seq, &self),
+                        _ => de::Error::custom(&e.to_string()),
+                    }
+                )
             }
 
             fn expecting(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
@@ -331,7 +328,7 @@ impl RecoverableSignature {
     /// representation is nonstandard and defined by the libsecp256k1
     /// library.
     pub fn from_compact(secp: &Secp256k1, data: &[u8], recid: RecoveryId) -> Result<RecoverableSignature, Error> {
-        let mut ret = unsafe { ffi::RecoverableSignature::blank() };
+        let mut ret = ffi::RecoverableSignature::new();
 
         unsafe {
             if data.len() != 64 {
@@ -368,7 +365,7 @@ impl RecoverableSignature {
     /// for verification
     #[inline]
     pub fn to_standard(&self, secp: &Secp256k1) -> Signature {
-        let mut ret = unsafe { ffi::Signature::blank() };
+        let mut ret = ffi::Signature::new();
         unsafe {
             let err = ffi::secp256k1_ecdsa_recoverable_signature_convert(secp.ctx, &mut ret, self.as_ptr());
             assert!(err == 1);
@@ -474,10 +471,26 @@ pub enum Error {
     IncorrectCommitSum,
     /// Range proof is invalid
     InvalidRangeProof,
-    /// Error creating partial signature
-    PartialSigFailure,
-    /// Failure subtracting two signatures
-    SigSubtractionFailure,
+    /// Failed to create a range proof
+    CannotMakeRangeProof,
+    /// Failed to create a bulletproof range proof
+    CannotMakeBulletproof,
+    /// Given bulletproof range proof is invalid
+    InvalidBulletproof,
+    /// Failed to rewind a bulletproof range proof
+    CannotRewindBulletproof,
+    /// Failed to create a signature
+    CannotCreateSignature,
+    /// Failed to export a secret nonce
+    CannotExportNonce,
+    /// Failed to combine signatures
+    CannotCombineSignatures,
+    /// Subtracted partial signature has no nonce with quadratic residue y
+    SignatureNoQuadraticResidue,
+    /// Failed to subtract a partial signature
+    CannotSubtractSignature,
+    /// Failed to create a partial signature
+    CannotCreatePartialSignature,
 }
 
 impl Error {
@@ -493,8 +506,16 @@ impl Error {
             Error::InvalidRecoveryId => "secp: bad recovery id",
             Error::IncorrectCommitSum => "secp: invalid pedersen commitment sum",
             Error::InvalidRangeProof => "secp: invalid range proof",
-            Error::PartialSigFailure => "secp: partial sig (aggsig) failure",
-            Error::SigSubtractionFailure => "secp: subtraction (aggsig) did not result in any valid signatures",
+            Error::CannotMakeRangeProof => "secp: failed to create range proof",
+            Error::CannotMakeBulletproof => "secp: failed to create bulletproof",
+            Error::InvalidBulletproof => "secp: invalid bulletproof",
+            Error::CannotRewindBulletproof => "secp: failed to rewind bulletproof",
+            Error::CannotCreateSignature => "secp: failed to create signature",
+            Error::CannotExportNonce => "secp: failed to export secret nonce",
+            Error::CannotCombineSignatures => "secp: failed to combine signatures",
+            Error::SignatureNoQuadraticResidue => "secp: signature subtraction has no quadratic residue",
+            Error::CannotSubtractSignature => "secp: failed to subtract partial signature",
+            Error::CannotCreatePartialSignature => "secp: failed to create partial signature",
         }
     }
 }
@@ -546,10 +567,9 @@ impl fmt::Display for ContextFlag {
 
 impl Clone for Secp256k1 {
     fn clone(&self) -> Secp256k1 {
-        Secp256k1 {
-            ctx: unsafe { ffi::secp256k1_context_clone(self.ctx) },
-            caps: self.caps
-        }
+        let ctx = unsafe { ffi::secp256k1_context_clone(self.ctx) };
+        assert!(!ctx.is_null(), "secp256k1_context_clone returned null");
+        Secp256k1 { ctx, caps: self.caps }
     }
 }
 
@@ -587,7 +607,9 @@ impl Secp256k1 {
                 ffi::SECP256K1_START_SIGN | ffi::SECP256K1_START_VERIFY
             }
         };
-        Secp256k1 { ctx: unsafe { ffi::secp256k1_context_create(flag) }, caps: caps }
+        let ctx = unsafe { ffi::secp256k1_context_create(flag) };
+        assert!(!ctx.is_null(), "secp256k1_context_create returned null");
+        Secp256k1 { ctx, caps }
     }
 
     /// Creates a new Secp256k1 context with no capabilities (just de/serialization)
@@ -633,7 +655,7 @@ impl Secp256k1 {
             return Err(Error::IncapableContext);
         }
 
-        let mut ret = unsafe { ffi::Signature::blank() };
+        let mut ret = ffi::Signature::new();
         unsafe {
             // We can assume the return value because it's not possible to construct
             // an invalid signature from a valid `Message` and `SecretKey`
@@ -652,7 +674,7 @@ impl Secp256k1 {
             return Err(Error::IncapableContext);
         }
 
-        let mut ret = unsafe { ffi::RecoverableSignature::blank() };
+        let mut ret = ffi::RecoverableSignature::new();
         unsafe {
             // We can assume the return value because it's not possible to construct
             // an invalid signature from a valid `Message` and `SecretKey`
@@ -671,7 +693,7 @@ impl Secp256k1 {
             return Err(Error::IncapableContext);
         }
 
-        let mut pk = unsafe { ffi::PublicKey::blank() };
+        let mut pk = ffi::PublicKey::new();
 
         unsafe {
             if ffi::secp256k1_ecdsa_recover(self.ctx, &mut pk,
