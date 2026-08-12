@@ -293,7 +293,7 @@ pub fn subtract_partial_signature(
 
 /// Manages an instance of an aggsig multisig context, and provides all methods
 /// to act on that context
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct AggSigContext {
 	ctx: *mut ffi::Context,
 	aggsig_ctx: *mut ffi::AggSigContext,
